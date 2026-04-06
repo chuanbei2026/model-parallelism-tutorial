@@ -185,100 +185,157 @@ def draw_tensor_split(tensor_shape, split_dim, num_splits, title="Tensor Split")
     return fig, ax
 
 
-def _generate_gpipe_schedule(num_stages, num_microbatches):
-    """Generate GPipe schedule: all forwards, then all backwards."""
+def _generate_gpipe_schedule(num_stages, num_microbatches, bwd_factor=2):
+    """Generate GPipe schedule: all forwards, then all backwards.
+
+    Returns list of (start_time, stage, microbatch, kind, duration).
+    Forward takes 1 time unit; backward takes *bwd_factor* time units.
+    """
     schedule = []
     # Forward passes: stage s starts micro-batch m at time s + m
     for m in range(num_microbatches):
         for s in range(num_stages):
             t = s + m
-            schedule.append((t, s, m, "fwd"))
-    # Backward passes start after all forwards complete
+            schedule.append((t, s, m, "fwd", 1))
+
+    # Backward passes start after ALL forwards complete.
     fwd_end = num_stages + num_microbatches - 1
-    for m in range(num_microbatches):
-        for s in range(num_stages - 1, -1, -1):
-            t = fwd_end + (num_stages - 1 - s) + m
-            schedule.append((t, s, m, "bwd"))
-    return schedule
 
-
-def _generate_1f1b_schedule(num_stages, num_microbatches):
-    """Generate 1F1B schedule: warmup, then steady state 1-fwd-1-bwd."""
-    schedule = []
-    # Track next available time for each stage
-    next_time = [0] * num_stages
-    fwd_done = [0] * num_stages  # count of forwards done per stage
-
-    # Warmup phase: fill the pipeline with forwards
-    for m in range(num_stages):
-        for s in range(num_stages):
-            if m < num_microbatches and s <= m:
-                pass  # handled below
-
-    # Simpler approach: compute schedule directly
-    # Forward: micro-batch m arrives at stage s at time m + s
-    fwd_times = {}
-    for m in range(num_microbatches):
-        for s in range(num_stages):
-            fwd_times[(s, m)] = m + s
-            schedule.append((m + s, s, m, "fwd"))
-
-    # Backward: 1F1B means after warmup, each stage does 1 bwd after each fwd
-    # Backward for micro-batch m at stage s:
-    # - Last stage starts bwd for m=0 at time (num_stages - 1) + 1 = num_stages
-    # - Then pipelines backward through stages
+    # Backward flows from last stage to first.
     bwd_times = {}
     for m in range(num_microbatches):
         for s in range(num_stages - 1, -1, -1):
-            # Backward at last stage for micro-batch m starts after its forward
             if s == num_stages - 1:
-                bwd_start = fwd_times[(s, m)] + 1
+                t = fwd_end + m * bwd_factor
             else:
-                # Must wait for backward from stage s+1 and any forward at this stage
-                bwd_start = bwd_times[(s + 1, m)] + 1
-            # Also must wait for this stage to finish its current work
-            bwd_times[(s, m)] = bwd_start
-
-    # Re-collect backward into schedule
-    for m in range(num_microbatches):
-        for s in range(num_stages - 1, -1, -1):
-            schedule.append((bwd_times[(s, m)], s, m, "bwd"))
+                t = bwd_times[(s + 1, m)] + bwd_factor
+            bwd_times[(s, m)] = t
+            schedule.append((t, s, m, "bwd", bwd_factor))
 
     return schedule
 
 
-def _generate_interleaved_schedule(num_stages, num_microbatches):
-    """Generate interleaved virtual pipeline schedule (2 virtual stages per GPU)."""
-    # With interleaving, each GPU holds multiple non-contiguous chunks
-    # For simplicity, show 2 virtual stages per physical GPU
-    # This effectively doubles the stages but halves layers per stage
-    virtual_stages = num_stages * 2
+def _generate_1f1b_schedule(num_stages, num_microbatches, bwd_factor=2):
+    """Generate 1F1B schedule with correct interleaving.
+
+    The schedule has three phases per stage:
+    1. Warmup: only forward passes to fill the pipeline
+    2. Steady state: alternating 1 forward + 1 backward (the "1F1B" pattern)
+    3. Cooldown: only backward passes to drain the pipeline
+
+    Returns list of (start_time, stage, microbatch, kind, duration).
+    """
+    p = num_stages
+    m = num_microbatches
+
+    # Track when each stage becomes free and forward/backward completion times
+    stage_free = [0] * p     # next available time slot for each stage
+    fwd_end = {}             # (stage, mb) -> end time of forward
+    bwd_end = {}             # (stage, mb) -> end time of backward
+
     schedule = []
 
-    # Forward passes through virtual stages
-    for m in range(num_microbatches):
-        for vs in range(virtual_stages):
-            physical_gpu = vs % num_stages
-            t = m * 2 + vs  # interleaved timing
-            schedule.append((t, physical_gpu, m, "fwd"))
+    # --- Assign forward passes ---
+    # Micro-batch mb arrives at stage s only after:
+    #   1) stage s is free
+    #   2) stage s-1 has finished forward for the same micro-batch
+    for mb in range(m):
+        for s in range(p):
+            earliest = stage_free[s]
+            if s > 0:
+                earliest = max(earliest, fwd_end[(s - 1, mb)])
+            fwd_end[(s, mb)] = earliest + 1
+            stage_free[s] = earliest + 1
+            schedule.append((earliest, s, mb, "fwd", 1))
 
-    # Backward passes
-    fwd_end = max(t for t, _, _, _ in schedule) + 1
-    for m in range(num_microbatches):
-        for vs in range(virtual_stages - 1, -1, -1):
-            physical_gpu = vs % num_stages
-            t = fwd_end + m * 2 + (virtual_stages - 1 - vs)
-            schedule.append((t, physical_gpu, m, "bwd"))
+        # In 1F1B, the last stage starts backward immediately after forward.
+        # This backward propagates up and "makes room" for the next forward.
+        s_last = p - 1
+        bwd_start = fwd_end[(s_last, mb)]
+        # But the last stage must also be free
+        bwd_start = max(bwd_start, stage_free[s_last])
+        bwd_end[(s_last, mb)] = bwd_start + bwd_factor
+        stage_free[s_last] = bwd_start + bwd_factor
+        schedule.append((bwd_start, s_last, mb, "bwd", bwd_factor))
+
+    # --- Assign remaining backward passes (stages 0..p-2) ---
+    # Process micro-batches in order; backward flows from stage p-2 down to 0.
+    for mb in range(m):
+        for s in range(p - 2, -1, -1):
+            earliest = stage_free[s]
+            # Must wait for stage s+1 to finish backward for same micro-batch
+            earliest = max(earliest, bwd_end[(s + 1, mb)])
+            bwd_end[(s, mb)] = earliest + bwd_factor
+            stage_free[s] = earliest + bwd_factor
+            schedule.append((earliest, s, mb, "bwd", bwd_factor))
+
+    return schedule
+
+
+def _generate_interleaved_schedule(num_stages, num_microbatches, bwd_factor=2):
+    """Generate interleaved 1F1B schedule (2 virtual stages per GPU).
+
+    Each physical GPU handles 2 non-contiguous layer chunks (virtual stages),
+    reducing the bubble by filling idle slots with work from the other chunk.
+    Uses 1F1B-style scheduling within the virtual pipeline.
+
+    Returns list of (start_time, stage, microbatch, kind, duration).
+    """
+    p = num_stages
+    v = 2  # virtual stages per GPU
+    vp = p * v  # total virtual stages
+    m = num_microbatches
+
+    stage_free = [0] * p
+    fwd_end = {}   # (virtual_stage, mb) -> end time
+    bwd_end = {}   # (virtual_stage, mb) -> end time
+
+    schedule = []
+
+    # Build a work queue: for each micro-batch, forward through all virtual
+    # stages, then the last virtual stage immediately starts backward.
+    # Process work items greedily: always schedule the earliest-ready item.
+
+    # Phase 1: Forward warmup — push micro-batches into the virtual pipeline
+    # Each micro-batch visits virtual stages 0..vp-1 in order.
+    for mb in range(m):
+        for vs in range(vp):
+            gpu = vs % p
+            earliest = stage_free[gpu]
+            if vs > 0:
+                earliest = max(earliest, fwd_end[(vs - 1, mb)])
+            fwd_end[(vs, mb)] = earliest + 1
+            stage_free[gpu] = earliest + 1
+            schedule.append((earliest, gpu, mb, "fwd", 1))
+
+        # Last virtual stage immediately does backward (1F1B style)
+        vs_last = vp - 1
+        gpu = vs_last % p
+        earliest = max(stage_free[gpu], fwd_end[(vs_last, mb)])
+        bwd_end[(vs_last, mb)] = earliest + bwd_factor
+        stage_free[gpu] = earliest + bwd_factor
+        schedule.append((earliest, gpu, mb, "bwd", bwd_factor))
+
+    # Phase 2: Remaining backward passes (virtual stages vp-2 down to 0)
+    for mb in range(m):
+        for vs in range(vp - 2, -1, -1):
+            gpu = vs % p
+            earliest = max(stage_free[gpu], bwd_end[(vs + 1, mb)])
+            bwd_end[(vs, mb)] = earliest + bwd_factor
+            stage_free[gpu] = earliest + bwd_factor
+            schedule.append((earliest, gpu, mb, "bwd", bwd_factor))
 
     return schedule
 
 
 def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
-                           title=None, figsize=None):
+                           title=None, figsize=None, bwd_factor=2):
     """Draw a pipeline parallelism execution timeline.
 
-    Renders a grid where rows = GPU stages, columns = time steps, and colored
-    blocks represent forward (blue) and backward (orange) micro-batch computations.
+    Renders a grid where rows = GPU stages, columns = time steps.
+    Forward blocks are 1 unit wide (blue); backward blocks are *bwd_factor*
+    units wide (orange), reflecting the assumption that backward takes
+    roughly 2x the compute of forward.
 
     Args:
         num_stages: Number of pipeline stages (GPUs).
@@ -286,6 +343,7 @@ def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
         schedule: Scheduling strategy ("gpipe", "1f1b", "interleaved").
         title: Plot title. Defaults to schedule name.
         figsize: Figure size tuple. Auto-calculated if None.
+        bwd_factor: Ratio of backward to forward duration (default 2).
 
     Returns:
         Tuple of (fig, ax) for further customization.
@@ -294,20 +352,20 @@ def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
         names = {"gpipe": "GPipe", "1f1b": "1F1B", "interleaved": "Interleaved"}
         title = f"{names.get(schedule, schedule)} Schedule — {num_stages} stages, {num_microbatches} micro-batches"
 
-    # Generate schedule
+    # Generate schedule — each entry is (start_time, stage, microbatch, kind, duration)
     if schedule == "gpipe":
-        sched = _generate_gpipe_schedule(num_stages, num_microbatches)
+        sched = _generate_gpipe_schedule(num_stages, num_microbatches, bwd_factor)
     elif schedule == "1f1b":
-        sched = _generate_1f1b_schedule(num_stages, num_microbatches)
+        sched = _generate_1f1b_schedule(num_stages, num_microbatches, bwd_factor)
     elif schedule == "interleaved":
-        sched = _generate_interleaved_schedule(num_stages, num_microbatches)
+        sched = _generate_interleaved_schedule(num_stages, num_microbatches, bwd_factor)
     else:
         raise ValueError(f"Unknown schedule: {schedule}. Use 'gpipe', '1f1b', or 'interleaved'.")
 
     # Determine grid dimensions
-    max_time = max(t for t, _, _, _ in sched) + 1
+    max_time = max(t + d for t, _, _, _, d in sched)
     if figsize is None:
-        figsize = (max(10, max_time * 0.6), max(3, num_stages * 1.0))
+        figsize = (max(10, max_time * 0.45), max(3, num_stages * 1.0))
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
 
@@ -315,8 +373,8 @@ def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
     fwd_cmap = plt.cm.Blues
     bwd_cmap = plt.cm.Oranges
 
-    # Draw blocks
-    for t, s, m, kind in sched:
+    # Draw blocks — width = duration
+    for t, s, m, kind, dur in sched:
         color_val = 0.3 + 0.5 * (m % num_microbatches) / max(num_microbatches - 1, 1)
         if kind == "fwd":
             color = fwd_cmap(color_val)
@@ -324,7 +382,7 @@ def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
             color = bwd_cmap(color_val)
 
         rect = patches.FancyBboxPatch(
-            (t + 0.05, s + 0.05), 0.9, 0.9,
+            (t + 0.05, s + 0.05), dur - 0.1, 0.9,
             boxstyle="round,pad=0.02",
             facecolor=color, edgecolor="white", linewidth=1.0
         )
@@ -332,13 +390,14 @@ def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
 
         # Label: F0, B0, etc.
         label = f"{'F' if kind == 'fwd' else 'B'}{m}"
-        ax.text(t + 0.5, s + 0.5, label, ha="center", va="center",
+        ax.text(t + dur / 2, s + 0.5, label, ha="center", va="center",
                 fontsize=7, fontweight="bold", color="white" if color_val > 0.5 else "black")
 
     # Shade bubble (empty) cells lightly
     occupied = set()
-    for t, s, m, kind in sched:
-        occupied.add((t, s))
+    for t, s, m, kind, dur in sched:
+        for dt in range(dur):
+            occupied.add((t + dt, s))
     for t in range(max_time):
         for s in range(num_stages):
             if (t, s) not in occupied:
@@ -360,8 +419,8 @@ def draw_pipeline_timeline(num_stages, num_microbatches, schedule="1f1b",
     ax.set_aspect("equal")
 
     # Legend
-    fwd_patch = patches.Patch(facecolor=fwd_cmap(0.5), label="Forward")
-    bwd_patch = patches.Patch(facecolor=bwd_cmap(0.5), label="Backward")
+    fwd_patch = patches.Patch(facecolor=fwd_cmap(0.5), label="Forward (1 unit)")
+    bwd_patch = patches.Patch(facecolor=bwd_cmap(0.5), label=f"Backward ({bwd_factor} units)")
     bubble_patch = patches.Patch(facecolor="#f0f0f0", edgecolor="#e0e0e0", label="Bubble (idle)")
     ax.legend(handles=[fwd_patch, bwd_patch, bubble_patch], loc="upper right",
               fontsize=8, framealpha=0.9)
