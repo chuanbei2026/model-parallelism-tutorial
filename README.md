@@ -4,16 +4,14 @@ Interactive, notebook-based teaching package for model parallelism and distribut
 
 ## Topics
 
-| # | Folder | Topic |
-|---|--------|-------|
-| 00 | `notebooks/00-gpu-communication/` | GPU Communication Primitives |
-| 01 | `notebooks/01-data-parallelism/` | Data Parallelism (DP) |
-| 02 | `notebooks/02-tensor-parallelism/` | Tensor Parallelism (TP) |
-| 03 | `notebooks/03-pipeline-parallelism/` | Pipeline Parallelism (PP) |
-| 04 | `notebooks/04-sequence-parallelism/` | Sequence Parallelism (SP) |
-| 05 | `notebooks/05-context-parallelism/` | Context Parallelism (CP) |
-| 06 | `notebooks/06-expert-parallelism/` | Expert Parallelism (EP / MoE) |
-| 07 | `notebooks/07-advanced-topics/` | Advanced Topics & Combined Strategies |
+| # | Topic | English | 中文 | 文言 |
+|---|-------|---------|------|------|
+| 01 | Data Parallelism (DP) | [EN](notebooks/01-data-parallelism/01-data-parallelism.en.ipynb) | [中文](notebooks/01-data-parallelism/01-data-parallelism.zh.ipynb) | [文言](notebooks/01-data-parallelism/01-data-parallelism.lzh.ipynb) |
+| 02 | Tensor Parallelism (TP) | [EN](notebooks/02-tensor-parallelism/01-tensor-parallelism.en.ipynb) | [中文](notebooks/02-tensor-parallelism/01-tensor-parallelism.zh.ipynb) | [文言](notebooks/02-tensor-parallelism/01-tensor-parallelism.lzh.ipynb) |
+| 03 | Pipeline Parallelism (PP) | [EN](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-en.ipynb) | [中文](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-zh.ipynb) | [文言](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-classical.ipynb) |
+| 04 | Sequence Parallelism (SP) | [EN](notebooks/04-sequence-parallelism/01-sequence-parallelism.en.ipynb) | [中文](notebooks/04-sequence-parallelism/01-sequence-parallelism.zh.ipynb) | [文言](notebooks/04-sequence-parallelism/01-sequence-parallelism.lzh.ipynb) |
+| 05 | Context Parallelism (CP) | [EN](notebooks/05-context-parallelism/01-context-parallelism.en.ipynb) | [中文](notebooks/05-context-parallelism/01-context-parallelism.zh.ipynb) | [文言](notebooks/05-context-parallelism/01-context-parallelism.lzh.ipynb) |
+| 06 | Expert Parallelism (EP / MoE) | [EN](notebooks/06-expert-parallelism/ep.en.ipynb) | [中文](notebooks/06-expert-parallelism/ep.zh.ipynb) | [文言](notebooks/06-expert-parallelism/ep.lzh.ipynb) |
 
 ## Setup
 
@@ -21,7 +19,7 @@ Interactive, notebook-based teaching package for model parallelism and distribut
 
 ```bash
 # Clone the repo
-git clone <repo-url> && cd tinker-model-parallelism
+git clone https://github.com/chuanbei2026/model-parallelism-tutorial.git && cd model-parallelism-tutorial
 
 # Install the package in editable mode
 pip install -e .
