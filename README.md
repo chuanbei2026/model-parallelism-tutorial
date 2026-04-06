@@ -1,3 +1,5 @@
+[中文版](README_zh.md)
+
 # Model Parallelism Tutorial
 
 Interactive, notebook-based teaching package for model parallelism and distributed training techniques. Learn DP, TP, PP, SP, CP, EP, GPU communication primitives, and more — with formulas, diagrams, runnable code, and Megatron-LM references.
