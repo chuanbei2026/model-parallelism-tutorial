@@ -1759,6 +1759,161 @@ def draw_process_group_boxes(dp_size=2, pp_size=2, tp_size=2,
     return fig, ax
 
 
+def draw_float_bits(formats=None, title="Floating-Point Bit Layouts", figsize=None):
+    """Draw side-by-side IEEE 754 bit-layout diagrams for floating-point formats.
+
+    Shows sign, exponent, and mantissa fields as colored rectangles with
+    bit counts, total bits, representable range, and machine epsilon.
+
+    Args:
+        formats: List of format names to show. Choose from
+            "fp32", "fp16", "bf16", "fp8_e4m3", "fp8_e5m2".
+            Defaults to all five.
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    FORMAT_SPECS = {
+        "fp32":     {"label": "FP32",     "sign": 1, "exp": 8,  "man": 23,
+                     "max": "3.4e38",  "eps": "1.2e-7",  "min_normal": "1.2e-38"},
+        "fp16":     {"label": "FP16",     "sign": 1, "exp": 5,  "man": 10,
+                     "max": "65504",   "eps": "9.8e-4",  "min_normal": "6.1e-5"},
+        "bf16":     {"label": "BF16",     "sign": 1, "exp": 8,  "man": 7,
+                     "max": "3.4e38",  "eps": "3.9e-3",  "min_normal": "1.2e-38"},
+        "fp8_e4m3": {"label": "FP8 E4M3", "sign": 1, "exp": 4,  "man": 3,
+                     "max": "448",     "eps": "1.25e-1", "min_normal": "6.1e-3"},
+        "fp8_e5m2": {"label": "FP8 E5M2", "sign": 1, "exp": 5,  "man": 2,
+                     "max": "57344",   "eps": "2.5e-1",  "min_normal": "6.1e-5"},
+    }
+
+    if formats is None:
+        formats = list(FORMAT_SPECS.keys())
+
+    n = len(formats)
+    if figsize is None:
+        figsize = (max(10, 3 * n), n * 1.4 + 1.5)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Colors: sign=red/pink, exponent=blue, mantissa=green
+    colors = {"sign": "#E57373", "exp": "#42A5F5", "man": "#66BB6A"}
+    scale = 0.3  # width per bit
+
+    y_pos = n * 1.2  # start from top
+    for fmt_name in formats:
+        spec = FORMAT_SPECS[fmt_name]
+        s, e, m = spec["sign"], spec["exp"], spec["man"]
+        total_bits = s + e + m
+
+        # Draw bit blocks left to right
+        x = 0
+        for field, count, color in [("sign", s, colors["sign"]),
+                                     ("exp", e, colors["exp"]),
+                                     ("man", m, colors["man"])]:
+            w = count * scale
+            rect = patches.FancyBboxPatch(
+                (x, y_pos - 0.35), w, 0.7,
+                boxstyle="round,pad=0.02",
+                facecolor=color, edgecolor="#333", linewidth=1.2, alpha=0.85
+            )
+            ax.add_patch(rect)
+            label = f"{count}" if count > 1 else "1"
+            ax.text(x + w / 2, y_pos, label, ha="center", va="center",
+                    fontsize=10, fontweight="bold", color="white")
+            x += w
+
+        # Format label on the left
+        ax.text(-0.3, y_pos, spec["label"], ha="right", va="center",
+                fontsize=11, fontweight="bold", color="#333")
+
+        # Info on the right
+        info = f"{total_bits}-bit  |  max={spec['max']}  |  \u03b5={spec['eps']}"
+        ax.text(x + 0.3, y_pos, info, ha="left", va="center",
+                fontsize=9, color="#555")
+
+        y_pos -= 1.2
+
+    # Legend
+    legend_handles = [
+        patches.Patch(facecolor=colors["sign"], label="Sign (1 bit)", alpha=0.85),
+        patches.Patch(facecolor=colors["exp"], label="Exponent", alpha=0.85),
+        patches.Patch(facecolor=colors["man"], label="Mantissa", alpha=0.85),
+    ]
+    ax.legend(handles=legend_handles, loc="lower right", fontsize=9,
+              framealpha=0.9, ncol=3)
+
+    max_bits = max(FORMAT_SPECS[f]["sign"] + FORMAT_SPECS[f]["exp"] + FORMAT_SPECS[f]["man"]
+                   for f in formats)
+    ax.set_xlim(-2.5, max_bits * scale + 6)
+    ax.set_ylim(y_pos - 0.5, n * 1.2 + 0.8)
+    ax.axis("off")
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
+
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_precision_comparison(formats=None, title="Float Format: Range & Precision",
+                              figsize=None):
+    """Create a log-scale visual comparison of representable ranges and precision.
+
+    Shows min-normal to max range as horizontal bars and annotates epsilon.
+
+    Args:
+        formats: List of format names (same as draw_float_bits).
+            Defaults to all five.
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    FORMAT_RANGES = {
+        "fp32":     {"label": "FP32",     "min": 1.2e-38,  "max": 3.4e38,   "eps": 1.2e-7},
+        "fp16":     {"label": "FP16",     "min": 6.1e-5,   "max": 6.55e4,   "eps": 9.8e-4},
+        "bf16":     {"label": "BF16",     "min": 1.2e-38,  "max": 3.4e38,   "eps": 3.9e-3},
+        "fp8_e4m3": {"label": "FP8 E4M3", "min": 6.1e-3,   "max": 448,      "eps": 1.25e-1},
+        "fp8_e5m2": {"label": "FP8 E5M2", "min": 6.1e-5,   "max": 5.73e4,   "eps": 2.5e-1},
+    }
+
+    if formats is None:
+        formats = list(FORMAT_RANGES.keys())
+
+    n = len(formats)
+    if figsize is None:
+        figsize = (12, max(3, n * 0.9 + 1))
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    bar_colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3"]
+    y_positions = list(range(n))
+
+    for i, fmt_name in enumerate(formats):
+        spec = FORMAT_RANGES[fmt_name]
+        log_min = np.log10(spec["min"])
+        log_max = np.log10(spec["max"])
+        color = bar_colors[i % len(bar_colors)]
+
+        # Horizontal bar from min to max on log scale
+        ax.barh(i, log_max - log_min, left=log_min, height=0.5,
+                color=color, edgecolor="#333", linewidth=1, alpha=0.8)
+        ax.text(log_max + 0.3, i, f"\u03b5={spec['eps']:.1e}",
+                va="center", fontsize=9, color="#555")
+
+    ax.set_yticks(y_positions)
+    ax.set_yticklabels([FORMAT_RANGES[f]["label"] for f in formats],
+                       fontsize=11, fontweight="bold")
+    ax.set_xlabel("log\u2081\u2080(value)", fontsize=11)
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
+    ax.grid(axis="x", alpha=0.3)
+    ax.invert_yaxis()
+
+    plt.tight_layout()
+    return fig, ax
+
+
 def draw_memory_breakdown_chart(configs, model_params_B=175, hidden=12288,
                                  layers=96, seq_len=2048, micro_batch=1,
                                  gpu_memory_gb=80,

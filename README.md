@@ -16,6 +16,7 @@ Interactive, notebook-based teaching package for model parallelism and distribut
 | 05 | Context Parallelism (CP) | [EN](notebooks/en/05-context-parallelism.ipynb) | [中文](notebooks/zh/05-context-parallelism.ipynb) | [文言](notebooks/lzh/05-context-parallelism.ipynb) |
 | 06 | Expert Parallelism (EP / MoE) | [EN](notebooks/en/06-expert-parallelism.ipynb) | [中文](notebooks/zh/06-expert-parallelism.ipynb) | [文言](notebooks/lzh/06-expert-parallelism.ipynb) |
 | 07 | Parallelism Mix Strategy | [EN](notebooks/en/07-parallelism-mix-strategy.ipynb) | [中文](notebooks/zh/07-parallelism-mix-strategy.ipynb) | [文言](notebooks/lzh/07-parallelism-mix-strategy.ipynb) |
+| 08 | Mixed-Precision Training | [EN](notebooks/en/08-mixed-precision-training.ipynb) | [中文](notebooks/zh/08-mixed-precision-training.ipynb) | [文言](notebooks/lzh/08-mixed-precision-training.ipynb) |
 
 ## Setup
 
