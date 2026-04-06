@@ -18,6 +18,7 @@ Karpathy 最近分享了他的 [obsidian-llm](https://gist.github.com/karpathy/4
 
 | 章节 | 内容 | EN | 中文 | 文言 |
 |------|------|----|------|------|
-| **模型并行** | GPU 通信、DP、TP、PP、SP、CP、EP、混合策略、混合精度、RL 对齐 | [10 notebooks](notebooks/en/model-parallelism/) | [10 notebooks](notebooks/zh/model-parallelism/) | [10 notebooks](notebooks/lzh/model-parallelism/) |
+| **模型并行** | GPU 通信、DP、TP、PP、SP、CP、EP、混合策略、混合精度 | [9 notebooks](notebooks/en/model-parallelism/) | [9 notebooks](notebooks/zh/model-parallelism/) | [9 notebooks](notebooks/lzh/model-parallelism/) |
+| **强化学习** | RL 基础、PPO、DPO、GRPO、SAPO、分布式 RL 系统 | [5 notebooks](notebooks/en/reinforcement-learning/) | [5 notebooks](notebooks/zh/reinforcement-learning/) | [5 notebooks](notebooks/lzh/reinforcement-learning/) |
 | **推理优化** | KV 缓存、Flash Attention、连续批处理、分页注意力、量化、投机解码、编译优化、服务架构 | [10 notebooks](notebooks/en/inference/) | [10 notebooks](notebooks/zh/inference/) | [10 notebooks](notebooks/lzh/inference/) |
 | **扩散模型** | DDPM、采样加速、CFG、潜空间扩散、DiT、视频生成、训练工程、微调 | [8 notebooks](notebooks/en/diffusion/) | [8 notebooks](notebooks/zh/diffusion/) | [8 notebooks](notebooks/lzh/diffusion/) |

@@ -18,6 +18,7 @@ Each chapter is a series of notebooks progressing from fundamentals to advanced 
 
 | Chapter | Description | EN | 中文 | 文言 |
 |--------|-------------|----|------|------|
-| **Model Parallelism** | GPU communication, DP, TP, PP, SP, CP, EP, mixed strategies, mixed precision, RL alignment | [10 notebooks](notebooks/en/model-parallelism/) | [10 notebooks](notebooks/zh/model-parallelism/) | [10 notebooks](notebooks/lzh/model-parallelism/) |
+| **Model Parallelism** | GPU communication, DP, TP, PP, SP, CP, EP, mixed strategies, mixed precision | [9 notebooks](notebooks/en/model-parallelism/) | [9 notebooks](notebooks/zh/model-parallelism/) | [9 notebooks](notebooks/lzh/model-parallelism/) |
+| **Reinforcement Learning** | RL foundations, PPO, DPO, GRPO, SAPO, distributed RL systems | [5 notebooks](notebooks/en/reinforcement-learning/) | [5 notebooks](notebooks/zh/reinforcement-learning/) | [5 notebooks](notebooks/lzh/reinforcement-learning/) |
 | **Inference Optimization** | KV cache, flash attention, continuous batching, paged attention, quantization, speculative decoding, compilation, serving | [10 notebooks](notebooks/en/inference/) | [10 notebooks](notebooks/zh/inference/) | [10 notebooks](notebooks/lzh/inference/) |
 | **Diffusion Models** | DDPM, sampling acceleration, CFG, latent diffusion, DiT, video generation, training engineering, fine-tuning | [8 notebooks](notebooks/en/diffusion/) | [8 notebooks](notebooks/zh/diffusion/) | [8 notebooks](notebooks/lzh/diffusion/) |
