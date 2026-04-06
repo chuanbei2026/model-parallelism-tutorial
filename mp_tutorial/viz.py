@@ -216,114 +216,177 @@ def _generate_gpipe_schedule(num_stages, num_microbatches, bwd_factor=2):
 
 
 def _generate_1f1b_schedule(num_stages, num_microbatches, bwd_factor=2):
-    """Generate 1F1B schedule with correct interleaving.
+    """Generate 1F1B schedule with correct per-stage interleaving.
 
-    The schedule has three phases per stage:
-    1. Warmup: only forward passes to fill the pipeline
-    2. Steady state: alternating 1 forward + 1 backward (the "1F1B" pattern)
-    3. Cooldown: only backward passes to drain the pipeline
+    Each stage independently follows three phases:
+    1. Warmup: forward-only passes (stage s does p-1-s warmup forwards)
+    2. Steady state: alternating 1 forward + 1 backward
+    3. Cooldown: backward-only passes to drain remaining work
 
     Returns list of (start_time, stage, microbatch, kind, duration).
     """
     p = num_stages
     m = num_microbatches
 
-    # Track when each stage becomes free and forward/backward completion times
-    stage_free = [0] * p     # next available time slot for each stage
-    fwd_end = {}             # (stage, mb) -> end time of forward
-    bwd_end = {}             # (stage, mb) -> end time of backward
+    # Build ordered operation sequence for each stage
+    stage_ops = []
+    for s in range(p):
+        ops = []
+        num_warmup = min(p - 1 - s, m)
+        num_1f1b = m - num_warmup
+        fwd_mb, bwd_mb = 0, 0
+        for _ in range(num_warmup):
+            ops.append(("fwd", fwd_mb)); fwd_mb += 1
+        for _ in range(num_1f1b):
+            ops.append(("fwd", fwd_mb)); fwd_mb += 1
+            ops.append(("bwd", bwd_mb)); bwd_mb += 1
+        for _ in range(num_warmup):
+            ops.append(("bwd", bwd_mb)); bwd_mb += 1
+        stage_ops.append(ops)
 
+    # Simulate: schedule ops respecting dependencies
+    stage_free = [0] * p
+    fwd_end = {}   # (stage, mb) -> end time
+    bwd_end = {}   # (stage, mb) -> end time
+    op_idx = [0] * p
     schedule = []
+    total_ops = sum(len(ops) for ops in stage_ops)
+    scheduled = 0
 
-    # --- Assign forward passes ---
-    # Micro-batch mb arrives at stage s only after:
-    #   1) stage s is free
-    #   2) stage s-1 has finished forward for the same micro-batch
-    for mb in range(m):
+    while scheduled < total_ops:
+        progress = False
         for s in range(p):
+            if op_idx[s] >= len(stage_ops[s]):
+                continue
+            kind, mb = stage_ops[s][op_idx[s]]
+            dur = 1 if kind == "fwd" else bwd_factor
+
             earliest = stage_free[s]
-            if s > 0:
+            if kind == "fwd" and s > 0:
+                if (s - 1, mb) not in fwd_end:
+                    continue
                 earliest = max(earliest, fwd_end[(s - 1, mb)])
-            fwd_end[(s, mb)] = earliest + 1
-            stage_free[s] = earliest + 1
-            schedule.append((earliest, s, mb, "fwd", 1))
+            elif kind == "bwd" and s < p - 1:
+                if (s + 1, mb) not in bwd_end:
+                    continue
+                earliest = max(earliest, bwd_end[(s + 1, mb)])
 
-        # In 1F1B, the last stage starts backward immediately after forward.
-        # This backward propagates up and "makes room" for the next forward.
-        s_last = p - 1
-        bwd_start = fwd_end[(s_last, mb)]
-        # But the last stage must also be free
-        bwd_start = max(bwd_start, stage_free[s_last])
-        bwd_end[(s_last, mb)] = bwd_start + bwd_factor
-        stage_free[s_last] = bwd_start + bwd_factor
-        schedule.append((bwd_start, s_last, mb, "bwd", bwd_factor))
+            if kind == "fwd":
+                fwd_end[(s, mb)] = earliest + dur
+            else:
+                bwd_end[(s, mb)] = earliest + dur
+            stage_free[s] = earliest + dur
+            schedule.append((earliest, s, mb, kind, dur))
+            op_idx[s] += 1
+            scheduled += 1
+            progress = True
 
-    # --- Assign remaining backward passes (stages 0..p-2) ---
-    # Process micro-batches in order; backward flows from stage p-2 down to 0.
-    for mb in range(m):
-        for s in range(p - 2, -1, -1):
-            earliest = stage_free[s]
-            # Must wait for stage s+1 to finish backward for same micro-batch
-            earliest = max(earliest, bwd_end[(s + 1, mb)])
-            bwd_end[(s, mb)] = earliest + bwd_factor
-            stage_free[s] = earliest + bwd_factor
-            schedule.append((earliest, s, mb, "bwd", bwd_factor))
+        if not progress:
+            break
 
     return schedule
 
 
 def _generate_interleaved_schedule(num_stages, num_microbatches, bwd_factor=2):
-    """Generate interleaved 1F1B schedule (2 virtual stages per GPU).
+    """Generate interleaved 1F1B schedule (v=2 virtual stages per GPU).
 
-    Each physical GPU handles 2 non-contiguous layer chunks (virtual stages),
-    reducing the bubble by filling idle slots with work from the other chunk.
-    Uses 1F1B-style scheduling within the virtual pipeline.
+    Each physical GPU handles 2 non-contiguous layer chunks (virtual stages).
+    The model has vp = 2*p virtual stages; virtual stage vs lives on GPU vs%p.
+    A micro-batch traverses vs 0→1→…→vp-1 in forward, reverse in backward.
 
-    Returns list of (start_time, stage, microbatch, kind, duration).
+    1F1B is applied at the virtual-stage level: each virtual stage vs has
+    warmup = vp-1-vs, then alternating fwd/bwd, then cooldown.  Operations
+    on the same GPU are serialised; dependency + GPU constraints are resolved
+    by simulation.
+
+    Returns list of (start_time, gpu, microbatch, kind, duration).
     """
     p = num_stages
-    v = 2  # virtual stages per GPU
-    vp = p * v  # total virtual stages
+    v = 2
+    vp = p * v
     m = num_microbatches
 
-    stage_free = [0] * p
-    fwd_end = {}   # (virtual_stage, mb) -> end time
-    bwd_end = {}   # (virtual_stage, mb) -> end time
+    # Build per-virtual-stage operation sequence (1F1B)
+    vs_ops = []  # vs_ops[vs] = [(kind, mb), ...]
+    for vs in range(vp):
+        ops = []
+        num_warmup = min(vp - 1 - vs, m)
+        num_1f1b = m - num_warmup
+        fwd_mb, bwd_mb = 0, 0
+        for _ in range(num_warmup):
+            ops.append(("fwd", fwd_mb)); fwd_mb += 1
+        for _ in range(num_1f1b):
+            ops.append(("fwd", fwd_mb)); fwd_mb += 1
+            ops.append(("bwd", bwd_mb)); bwd_mb += 1
+        for _ in range(num_warmup):
+            ops.append(("bwd", bwd_mb)); bwd_mb += 1
+        vs_ops.append(ops)
 
+    # Merge into per-GPU queues ordered so 1F1B interleaving happens on each GPU.
+    # We interleave the per-vs op lists by assigning each op a sequence number
+    # that reflects when it "should" execute in an ideal 1F1B pipeline.
+    # Forward (vs, mb) natural time = vs + mb.
+    # Backward (vs, mb) natural time = (vp-1-vs) + mb, shifted to start after
+    # the corresponding forward completes: offset by vp so bwd ops sort after
+    # enough fwd ops have been queued, but interleave with later fwd ops.
+    gpu_queues = [[] for _ in range(p)]
+    for vs in range(vp):
+        gpu = vs % p
+        for kind, mb in vs_ops[vs]:
+            if kind == "fwd":
+                pri = vs + mb
+            else:
+                # Backward's natural pipeline position, shifted so it
+                # interleaves with forwards (not all-after).
+                pri = (vp - 1 - vs) + mb + vp
+            gpu_queues[gpu].append((pri, vs, kind, mb))
+
+    for gpu in range(p):
+        gpu_queues[gpu].sort()
+
+    # Simulate with dependency constraints
+    gpu_free = [0] * p
+    fwd_end = {}  # (vs, mb) -> end time
+    bwd_end = {}  # (vs, mb) -> end time
+    q_idx = [0] * p
     schedule = []
+    total_ops = sum(len(q) for q in gpu_queues)
+    scheduled = 0
 
-    # Build a work queue: for each micro-batch, forward through all virtual
-    # stages, then the last virtual stage immediately starts backward.
-    # Process work items greedily: always schedule the earliest-ready item.
+    while scheduled < total_ops:
+        progress = False
+        for gpu in range(p):
+            if q_idx[gpu] >= len(gpu_queues[gpu]):
+                continue
+            _pri, vs, kind, mb = gpu_queues[gpu][q_idx[gpu]]
+            dur = 1 if kind == "fwd" else bwd_factor
 
-    # Phase 1: Forward warmup — push micro-batches into the virtual pipeline
-    # Each micro-batch visits virtual stages 0..vp-1 in order.
-    for mb in range(m):
-        for vs in range(vp):
-            gpu = vs % p
-            earliest = stage_free[gpu]
-            if vs > 0:
+            earliest = gpu_free[gpu]
+            if kind == "fwd" and vs > 0:
+                if (vs - 1, mb) not in fwd_end:
+                    continue
                 earliest = max(earliest, fwd_end[(vs - 1, mb)])
-            fwd_end[(vs, mb)] = earliest + 1
-            stage_free[gpu] = earliest + 1
-            schedule.append((earliest, gpu, mb, "fwd", 1))
+            elif kind == "bwd":
+                # Must have completed own forward first
+                if (vs, mb) not in fwd_end:
+                    continue
+                if vs < vp - 1:
+                    if (vs + 1, mb) not in bwd_end:
+                        continue
+                    earliest = max(earliest, bwd_end[(vs + 1, mb)])
 
-        # Last virtual stage immediately does backward (1F1B style)
-        vs_last = vp - 1
-        gpu = vs_last % p
-        earliest = max(stage_free[gpu], fwd_end[(vs_last, mb)])
-        bwd_end[(vs_last, mb)] = earliest + bwd_factor
-        stage_free[gpu] = earliest + bwd_factor
-        schedule.append((earliest, gpu, mb, "bwd", bwd_factor))
+            if kind == "fwd":
+                fwd_end[(vs, mb)] = earliest + dur
+            else:
+                bwd_end[(vs, mb)] = earliest + dur
+            gpu_free[gpu] = earliest + dur
+            schedule.append((earliest, gpu, mb, kind, dur))
+            q_idx[gpu] += 1
+            scheduled += 1
+            progress = True
 
-    # Phase 2: Remaining backward passes (virtual stages vp-2 down to 0)
-    for mb in range(m):
-        for vs in range(vp - 2, -1, -1):
-            gpu = vs % p
-            earliest = max(stage_free[gpu], bwd_end[(vs + 1, mb)])
-            bwd_end[(vs, mb)] = earliest + bwd_factor
-            stage_free[gpu] = earliest + bwd_factor
-            schedule.append((earliest, gpu, mb, "bwd", bwd_factor))
+        if not progress:
+            break
 
     return schedule
 
