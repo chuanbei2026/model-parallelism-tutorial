@@ -108,3 +108,72 @@ def code_reference(code, source="Megatron-LM", filepath=None):
         f'<code>{code}</code></pre></div>'
     )
     display(HTML(html))
+def formula_breakdown(rows, title=None):
+    """Display a 3-column formula breakdown: English | Math | PyTorch code.
+
+    Each row clarifies one term or step in a formula derivation.
+
+    Args:
+        rows: List of (english, math, code) tuples.
+        title: Optional title for the table.
+    """
+    title_html = ""
+    if title:
+        title_html = (
+            f'<div style="font-weight:bold;font-size:14px;'
+            f'margin-bottom:8px;">{title}</div>'
+        )
+    header = (
+        '<tr>'
+        '<th style="padding:8px 12px;border-bottom:2px solid #ddd;'
+        'text-align:left;background:#f0f7ff;width:35%;">In Plain English</th>'
+        '<th style="padding:8px 12px;border-bottom:2px solid #ddd;'
+        'text-align:center;background:#f0f7ff;width:30%;">Math</th>'
+        '<th style="padding:8px 12px;border-bottom:2px solid #ddd;'
+        'text-align:left;background:#f0f7ff;width:35%;">PyTorch</th>'
+        '</tr>'
+    )
+    body = ""
+    for eng, math, code in rows:
+        code_html = f'<code style="font-size:12px;">{code}</code>' if code else ""
+        body += (
+            f'<tr>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #eee;">{eng}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #eee;'
+            f'text-align:center;font-style:italic;">{math}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #eee;">'
+            f'{code_html}</td>'
+            f'</tr>'
+        )
+    html = (
+        f'{title_html}'
+        f'<table style="border-collapse:collapse;font-family:sans-serif;'
+        f'font-size:13px;margin:8px 0;width:100%;">'
+        f'<thead>{header}</thead>'
+        f'<tbody>{body}</tbody></table>'
+    )
+    display(HTML(html))
+
+
+def code_reference(code, source="Megatron-LM", filepath=None):
+    """Display a highlighted code reference block.
+
+    Args:
+        code: Code string to display.
+        source: Source framework/project name.
+        filepath: Optional file path in the source project.
+    """
+    path_html = ""
+    if filepath:
+        path_html = f' — <code>{filepath}</code>'
+    html = (
+        f'<div style="margin:8px 0;border:1px solid #ddd;border-radius:4px;'
+        f'overflow:hidden;">'
+        f'<div style="background:#f8f9fa;padding:6px 12px;font-size:12px;'
+        f'font-family:sans-serif;border-bottom:1px solid #ddd;color:#555;">'
+        f'📖 {source}{path_html}</div>'
+        f'<pre style="margin:0;padding:12px;background:#fff;'
+        f'font-size:13px;overflow-x:auto;">'
+        f'<code>{code}</code></pre></div>'
+    )
+    display(HTML(html))

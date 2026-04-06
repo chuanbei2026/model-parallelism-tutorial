@@ -12,12 +12,12 @@ That's how this repo started. The next step is to build an automated workflow: w
 
 Happy to share with everyone — humans and AI alike. Let's grow together.
 
-## Modules
+## Chapters
 
-Each module is a series of notebooks progressing from fundamentals to advanced topics. Pick a language to browse:
+Each chapter is a series of notebooks progressing from fundamentals to advanced topics. Pick a language to browse:
 
-| Module | Description | EN | 中文 | 文言 |
+| Chapter | Description | EN | 中文 | 文言 |
 |--------|-------------|----|------|------|
-| **Model Parallelism** | GPU communication, DP, TP, PP, SP, CP, EP, mixed strategies, mixed precision | [9 notebooks](notebooks/en/model-parallelism/) | [9 notebooks](notebooks/zh/model-parallelism/) | [9 notebooks](notebooks/lzh/model-parallelism/) |
+| **Model Parallelism** | GPU communication, DP, TP, PP, SP, CP, EP, mixed strategies, mixed precision, RL alignment | [10 notebooks](notebooks/en/model-parallelism/) | [10 notebooks](notebooks/zh/model-parallelism/) | [10 notebooks](notebooks/lzh/model-parallelism/) |
 | **Inference Optimization** | KV cache, flash attention, continuous batching, paged attention, quantization, speculative decoding, compilation, serving | [10 notebooks](notebooks/en/inference/) | [10 notebooks](notebooks/zh/inference/) | [10 notebooks](notebooks/lzh/inference/) |
 | **Diffusion Models** | DDPM, sampling acceleration, CFG, latent diffusion, DiT, video generation, training engineering, fine-tuning | [8 notebooks](notebooks/en/diffusion/) | [8 notebooks](notebooks/zh/diffusion/) | [8 notebooks](notebooks/lzh/diffusion/) |

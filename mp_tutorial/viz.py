@@ -2005,3 +2005,573 @@ def draw_memory_breakdown_chart(configs, model_params_B=175, hidden=12288,
 
     plt.tight_layout()
     return fig, ax
+def draw_training_pipeline(title="LLM Training Pipeline", figsize=None):
+    """Draw the three-stage LLM training pipeline: Pre-training → SFT → RL.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    if figsize is None:
+        figsize = (12, 3)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(-0.5, 10.5)
+    ax.set_ylim(-1.0, 2.5)
+    ax.axis("off")
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
+
+    stages = [
+        (1.0, "Pre-training", "Predict next token\non massive text", "#4C72B0"),
+        (4.5, "SFT", "Fine-tune on\nhuman demonstrations", "#55A868"),
+        (8.0, "RL Alignment", "Optimize for\nhuman preferences", "#DD8452"),
+    ]
+    box_w, box_h = 2.8, 1.6
+    for cx, label, desc, color in stages:
+        rect = patches.FancyBboxPatch(
+            (cx - box_w / 2, 0), box_w, box_h,
+            boxstyle="round,pad=0.15", facecolor=color,
+            edgecolor="#333", linewidth=1.5, alpha=0.85,
+        )
+        ax.add_patch(rect)
+        ax.text(cx, 1.05, label, ha="center", va="center",
+                fontsize=12, fontweight="bold", color="white")
+        ax.text(cx, 0.35, desc, ha="center", va="center",
+                fontsize=9, color="white", style="italic")
+
+    # Arrows between stages
+    for x1, x2 in [(2.4, 3.1), (5.9, 6.6)]:
+        ax.annotate("", xy=(x2, 0.8), xytext=(x1, 0.8),
+                    arrowprops=dict(arrowstyle="->,head_width=0.15",
+                                    color="#555", lw=2))
+
+    # Bottom annotation
+    ax.text(5.25, -0.6,
+            "This notebook focuses on the third stage: RL alignment",
+            ha="center", va="center", fontsize=10, color="#888",
+            style="italic")
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_rlhf_architecture(title="RLHF / PPO Training Loop", figsize=None):
+    """Draw the 4-model RLHF architecture with data flow arrows.
+
+    Shows: Actor (policy), Critic (value), Reward Model, Reference Model
+    and the data flow between them.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    if figsize is None:
+        figsize = (11, 7)
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(-0.5, 10.5)
+    ax.set_ylim(-0.5, 8.0)
+    ax.axis("off")
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
+
+    # Model boxes: (cx, cy, label, subtitle, color, trainable)
+    models = [
+        (2.5, 6.0, "Actor", "Policy model\n(trainable)", "#4C72B0", True),
+        (7.5, 6.0, "Critic", "Value model\n(trainable)", "#55A868", True),
+        (7.5, 2.0, "Reward Model", "Scores responses\n(frozen)", "#DD8452", False),
+        (2.5, 2.0, "Reference Model", "KL anchor\n(frozen)", "#8172B3", False),
+    ]
+
+    bw, bh = 2.8, 1.6
+    for cx, cy, label, subtitle, color, trainable in models:
+        rect = patches.FancyBboxPatch(
+            (cx - bw / 2, cy - bh / 2), bw, bh,
+            boxstyle="round,pad=0.12", facecolor=color,
+            edgecolor="#333", linewidth=2 if trainable else 1.5,
+            linestyle="-" if trainable else "--", alpha=0.85,
+        )
+        ax.add_patch(rect)
+        ax.text(cx, cy + 0.25, label, ha="center", va="center",
+                fontsize=12, fontweight="bold", color="white")
+        ax.text(cx, cy - 0.35, subtitle, ha="center", va="center",
+                fontsize=8, color="white", style="italic")
+
+    # Data flow arrows
+    arrow_kw = dict(arrowstyle="->,head_width=0.12", lw=1.8)
+
+    def _labeled_arrow(x1, y1, x2, y2, label, color="#555", offset=(0, 0)):
+        ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
+                    arrowprops=dict(**arrow_kw, color=color))
+        mx, my = (x1 + x2) / 2 + offset[0], (y1 + y2) / 2 + offset[1]
+        ax.text(mx, my, label, ha="center", va="center",
+                fontsize=8, color=color, fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                          ec="none", alpha=0.85))
+
+    # Actor → generates responses (down-right)
+    _labeled_arrow(3.9, 5.6, 6.1, 2.8, "responses", "#C44E52", offset=(0.5, 0))
+    # Reward Model → reward scores (up to Critic area)
+    _labeled_arrow(7.5, 2.8, 7.5, 5.2, "reward\nscores", "#DD8452", offset=(0.7, 0))
+    # Critic → advantage estimates (left to Actor)
+    _labeled_arrow(6.1, 6.0, 3.9, 6.0, "advantage", "#55A868", offset=(0, 0.35))
+    # Reference → KL penalty (right to Actor)
+    _labeled_arrow(2.5, 2.8, 2.5, 5.2, "KL\npenalty", "#8172B3", offset=(-0.7, 0))
+    # Update arrow (loop)
+    ax.annotate("", xy=(1.1, 6.8), xytext=(1.1, 5.2),
+                arrowprops=dict(arrowstyle="<-", color="#4C72B0", lw=2,
+                                connectionstyle="arc3,rad=-0.5"))
+    ax.text(0.2, 6.0, "update\nweights", ha="center", fontsize=8,
+            color="#4C72B0", fontweight="bold")
+
+    # Legend
+    ax.text(5.0, -0.1,
+            "Solid border = trainable    Dashed border = frozen",
+            ha="center", fontsize=9, color="#888")
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_rl_algorithm_comparison(title="PPO vs DPO vs GRPO", figsize=None):
+    """Side-by-side comparison showing which models each RL approach needs.
+
+    Returns:
+        Tuple of (fig, axes).
+    """
+    if figsize is None:
+        figsize = (14, 5)
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+
+    algos = [
+        ("PPO (RLHF)", ["Actor", "Critic", "Reward\nModel", "Reference"],
+         ["#4C72B0", "#55A868", "#DD8452", "#8172B3"],
+         [True, True, False, False]),
+        ("DPO", ["Policy", "Reference", "", ""],
+         ["#4C72B0", "#8172B3", "#ffffff", "#ffffff"],
+         [True, False, False, False]),
+        ("GRPO", ["Policy", "Reference", "", ""],
+         ["#4C72B0", "#8172B3", "#ffffff", "#ffffff"],
+         [True, False, False, False]),
+    ]
+
+    for ax, (name, labels, colors, trainable) in zip(axes, algos):
+        ax.set_xlim(-0.5, 3.5)
+        ax.set_ylim(-0.5, 4.5)
+        ax.axis("off")
+        ax.set_title(name, fontsize=13, fontweight="bold")
+
+        active = [(l, c, t) for l, c, t in zip(labels, colors, trainable) if l]
+        n = len(active)
+        for i, (label, color, is_train) in enumerate(active):
+            y = 3.5 - i * 1.2
+            rect = patches.FancyBboxPatch(
+                (0.3, y - 0.35), 2.4, 0.7,
+                boxstyle="round,pad=0.1", facecolor=color,
+                edgecolor="#333", linewidth=1.5 if is_train else 1,
+                linestyle="-" if is_train else "--", alpha=0.85,
+            )
+            ax.add_patch(rect)
+            ax.text(1.5, y, label, ha="center", va="center",
+                    fontsize=10, fontweight="bold", color="white")
+            tag = "trainable" if is_train else "frozen"
+            ax.text(2.85, y, tag, ha="left", va="center",
+                    fontsize=7, color="#888", style="italic")
+
+        # Model count badge
+        ax.text(1.5, -0.2, f"{n} model{'s' if n > 1 else ''} in memory",
+                ha="center", fontsize=10, fontweight="bold",
+                color="#C44E52" if n > 2 else "#55A868")
+
+    fig.suptitle(title, fontsize=15, fontweight="bold", y=1.02)
+    plt.tight_layout()
+    return fig, axes
+
+
+def draw_rl_gpu_placement(strategy="colocated",
+                          title=None, figsize=None):
+    """Show GPU placement strategies for multi-model RL training.
+
+    Args:
+        strategy: "colocated" or "separated".
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    if title is None:
+        titles = {
+            "colocated": "Colocated: All Models Share GPUs (time-sliced)",
+            "separated": "Separated: Dedicated GPU Groups per Model",
+        }
+        title = titles.get(strategy, strategy)
+    if figsize is None:
+        figsize = (10, 5)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.axis("off")
+    ax.set_title(title, fontsize=13, fontweight="bold", pad=12)
+
+    model_colors = {
+        "Actor": "#4C72B0", "Critic": "#55A868",
+        "Reward": "#DD8452", "Reference": "#8172B3",
+    }
+
+    if strategy == "colocated":
+        ax.set_xlim(-0.5, 8.5)
+        ax.set_ylim(-0.5, 5.0)
+        for gpu_i in range(4):
+            x = gpu_i * 2.1 + 0.2
+            # GPU box
+            bg = patches.FancyBboxPatch(
+                (x, 0.3), 1.8, 4.0,
+                boxstyle="round,pad=0.1", facecolor="#f0f0f0",
+                edgecolor="#aaa", linewidth=1.5,
+            )
+            ax.add_patch(bg)
+            ax.text(x + 0.9, 4.5, f"GPU {gpu_i}", ha="center",
+                    fontsize=10, fontweight="bold")
+            # All 4 models stacked inside
+            for j, (name, color) in enumerate(model_colors.items()):
+                y = 0.5 + j * 0.9
+                rect = patches.FancyBboxPatch(
+                    (x + 0.1, y), 1.6, 0.7,
+                    boxstyle="round,pad=0.06", facecolor=color,
+                    edgecolor="#333", linewidth=1, alpha=0.8,
+                )
+                ax.add_patch(rect)
+                ax.text(x + 0.9, y + 0.35, name, ha="center", va="center",
+                        fontsize=8, fontweight="bold", color="white")
+
+    elif strategy == "separated":
+        ax.set_xlim(-0.5, 10.5)
+        ax.set_ylim(-0.5, 4.5)
+        groups = [
+            ("Actor", [0, 1], "#4C72B0"),
+            ("Critic", [2], "#55A868"),
+            ("Reward", [3], "#DD8452"),
+            ("Reference", [0, 1], "#8172B3"),  # shares with actor
+        ]
+        # Draw GPU boxes
+        for gpu_i in range(4):
+            x = gpu_i * 2.5 + 0.5
+            bg = patches.FancyBboxPatch(
+                (x, 0.3), 1.8, 3.0,
+                boxstyle="round,pad=0.1", facecolor="#f0f0f0",
+                edgecolor="#aaa", linewidth=1.5,
+            )
+            ax.add_patch(bg)
+            ax.text(x + 0.9, 3.6, f"GPU {gpu_i}", ha="center",
+                    fontsize=10, fontweight="bold")
+
+        # Label which models go where
+        placements = {0: [], 1: [], 2: [], 3: []}
+        for name, gpus, color in groups:
+            for g in gpus:
+                placements[g].append((name, color))
+
+        for gpu_i, models in placements.items():
+            x = gpu_i * 2.5 + 0.5
+            for j, (name, color) in enumerate(models):
+                y = 0.5 + j * 1.0
+                rect = patches.FancyBboxPatch(
+                    (x + 0.1, y), 1.6, 0.8,
+                    boxstyle="round,pad=0.06", facecolor=color,
+                    edgecolor="#333", linewidth=1, alpha=0.8,
+                )
+                ax.add_patch(rect)
+                ax.text(x + 0.9, y + 0.4, name, ha="center", va="center",
+                        fontsize=8, fontweight="bold", color="white")
+
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_ppo_clip(eps=0.2, title="PPO Clipped Objective", figsize=None):
+    """Visualize the PPO clipping function.
+
+    Shows the unclipped and clipped objectives, with the clipped region shaded.
+
+    Args:
+        eps: Clipping parameter epsilon.
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, axes) with two subplots for positive and negative advantage.
+    """
+    if figsize is None:
+        figsize = (12, 4.5)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    r = np.linspace(0.3, 2.0, 300)
+
+    for ax, adv_sign, adv_label in [(ax1, 1.0, "Advantage > 0 (good action)"),
+                                     (ax2, -1.0, "Advantage < 0 (bad action)")]:
+        unclipped = r * adv_sign
+        clipped = np.clip(r, 1 - eps, 1 + eps) * adv_sign
+        objective = np.minimum(unclipped, clipped) if adv_sign > 0 else np.maximum(unclipped, clipped)
+
+        ax.plot(r, unclipped, "--", color="#aaa", lw=1.5, label="Unclipped: r(θ) × A")
+        ax.plot(r, objective, "-", color="#4C72B0", lw=2.5, label="PPO objective: min/max")
+
+        # Shade clipped region
+        ax.axvspan(1 - eps, 1 + eps, alpha=0.1, color="#55A868", label=f"Clip zone [1-ε, 1+ε]")
+        ax.axvline(1 - eps, color="#55A868", lw=1, ls="--", alpha=0.7)
+        ax.axvline(1 + eps, color="#55A868", lw=1, ls="--", alpha=0.7)
+        ax.axvline(1.0, color="#C44E52", lw=1, ls=":", alpha=0.5, label="r = 1 (no change)")
+        ax.axhline(0, color="#888", lw=0.5)
+
+        ax.set_xlabel("Probability ratio r(θ) = π_new / π_old", fontsize=10)
+        ax.set_ylabel("Objective", fontsize=10)
+        ax.set_title(adv_label, fontsize=11, fontweight="bold")
+        ax.legend(fontsize=8, loc="upper left" if adv_sign > 0 else "lower left")
+        ax.grid(alpha=0.3)
+
+    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
+    plt.tight_layout()
+    return fig, (ax1, ax2)
+
+
+def draw_group_ranking(scores, group_labels=None,
+                       title="GRPO: Group Relative Ranking", figsize=None):
+    """Visualize GRPO's group-relative advantage estimation.
+
+    Shows a group of generated outputs with their rewards, the group mean,
+    and which outputs get positive/negative advantage.
+
+    Args:
+        scores: List or array of reward scores for the group.
+        group_labels: Optional labels for each group member.
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    scores = np.asarray(scores, dtype=float)
+    n = len(scores)
+    if group_labels is None:
+        group_labels = [f"Output {i}" for i in range(n)]
+    if figsize is None:
+        figsize = (10, 4)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    mean = scores.mean()
+    std = scores.std() + 1e-8
+    advantages = (scores - mean) / std
+
+    colors = ["#55A868" if a > 0 else "#C44E52" for a in advantages]
+    bars = ax.barh(range(n), scores, color=colors, edgecolor="#333",
+                   linewidth=1, height=0.6, alpha=0.85)
+
+    # Mean line
+    ax.axvline(mean, color="#4C72B0", lw=2, ls="--", label=f"Group mean = {mean:.2f}")
+
+    for i, (s, a) in enumerate(zip(scores, advantages)):
+        sign = "+" if a > 0 else ""
+        ax.text(s + 0.02 * (scores.max() - scores.min()),
+                i, f"  adv={sign}{a:.2f}", va="center", fontsize=9,
+                fontweight="bold", color=colors[i])
+
+    ax.set_yticks(range(n))
+    ax.set_yticklabels(group_labels, fontsize=9)
+    ax.set_xlabel("Reward Score", fontsize=11)
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.legend(fontsize=10)
+    ax.grid(axis="x", alpha=0.3)
+    ax.invert_yaxis()
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_progressive_models(stage=4, title=None, figsize=None):
+    """Show progressive model buildup from 1 to 4 models.
+
+    Args:
+        stage: 1=REINFORCE, 2=+baseline, 3=+reference, 4=+reward model.
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    configs = {
+        1: [("Policy", "#4C72B0", True)],
+        2: [("Policy", "#4C72B0", True), ("Value\n(Critic)", "#55A868", True)],
+        3: [("Policy", "#4C72B0", True), ("Value\n(Critic)", "#55A868", True),
+            ("Reference", "#8172B3", False)],
+        4: [("Policy", "#4C72B0", True), ("Value\n(Critic)", "#55A868", True),
+            ("Reference", "#8172B3", False), ("Reward\nModel", "#DD8452", False)],
+    }
+    labels = {
+        1: "REINFORCE: 1 model",
+        2: "+Baseline: 2 models (fix high variance)",
+        3: "+KL Penalty: 3 models (fix reward hacking)",
+        4: "+Reward Model: 4 models (learn from humans)",
+    }
+    if title is None:
+        title = labels.get(stage, f"Stage {stage}")
+    models = configs.get(stage, configs[4])
+    n = len(models)
+
+    if figsize is None:
+        figsize = (max(4, n * 2.5), 3)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(-0.5, n * 2.5)
+    ax.set_ylim(-0.5, 2.5)
+    ax.axis("off")
+    ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
+
+    bw, bh = 2.0, 1.6
+    for i, (label, color, trainable) in enumerate(models):
+        x = i * 2.3 + 0.2
+        rect = patches.FancyBboxPatch(
+            (x, 0.2), bw, bh,
+            boxstyle="round,pad=0.12", facecolor=color,
+            edgecolor="#333", linewidth=1.5 if trainable else 1,
+            linestyle="-" if trainable else "--", alpha=0.85,
+        )
+        ax.add_patch(rect)
+        ax.text(x + bw / 2, 1.0, label, ha="center", va="center",
+                fontsize=10, fontweight="bold", color="white")
+        tag = "trainable" if trainable else "frozen"
+        ax.text(x + bw / 2, 0.35, tag, ha="center", va="center",
+                fontsize=7, color="white", style="italic")
+
+    # Memory annotation
+    mem_x = f"~{n}x model size"
+    ax.text(n * 2.3 / 2 + 0.2, -0.2, f"Memory: {mem_x}",
+            ha="center", fontsize=10, color="#C44E52", fontweight="bold")
+
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_method_timeline(title="RL for LLMs: Evolution", figsize=None):
+    """Draw a horizontal timeline of RL methods for LLMs.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    if figsize is None:
+        figsize = (14, 3.5)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(-0.5, 12.5)
+    ax.set_ylim(-1.0, 2.5)
+    ax.axis("off")
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=12)
+
+    events = [
+        (0.5, "REINFORCE\n(1992)", "Basic policy\ngradient", "#8C8C8C"),
+        (2.7, "PPO\n(2017)", "Stable training\nwith clipping", "#4C72B0"),
+        (5.0, "RLHF\n(2022)", "PPO + reward\nmodel from humans", "#55A868"),
+        (7.3, "DPO\n(2023)", "No reward model\nneeded", "#DD8452"),
+        (9.5, "GRPO\n(2024)", "No critic model\n(DeepSeek-R1)", "#C44E52"),
+        (11.5, "SAPO\n(2024)", "Self-aligned\npreferences", "#8172B3"),
+    ]
+
+    # Timeline line
+    ax.plot([-0.2, 12.3], [1.0, 1.0], color="#ccc", lw=3, zorder=0)
+
+    for x, label, desc, color in events:
+        # Dot on timeline
+        ax.scatter(x, 1.0, s=120, color=color, zorder=3, edgecolors="#333", lw=1.5)
+        # Label above
+        ax.text(x, 1.55, label, ha="center", va="bottom",
+                fontsize=9, fontweight="bold", color=color)
+        # Description below
+        ax.text(x, 0.5, desc, ha="center", va="top",
+                fontsize=7, color="#666", style="italic")
+
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_memory_breakdown_chart(configs, model_params_B=175, hidden=12288,
+                                 layers=96, seq_len=2048, micro_batch=1,
+                                 gpu_memory_gb=80,
+                                 title=None, figsize=None):
+    """Draw stacked bar chart showing memory breakdown per GPU for different configs.
+
+    Each bar is split into: weights (fp16), optimizer (fp32), gradients, activations.
+    A horizontal dashed line shows the GPU memory limit.
+
+    Args:
+        configs: List of dicts {"tp": int, "pp": int, "dp": int, "label": str}.
+        model_params_B: Model parameters in billions.
+        hidden: Hidden dimension.
+        layers: Total transformer layers.
+        seq_len: Sequence length.
+        micro_batch: Micro-batch size.
+        gpu_memory_gb: GPU memory limit (for reference line).
+        title: Plot title.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, ax).
+    """
+    if title is None:
+        title = f"Memory Breakdown per GPU — {model_params_B}B Model"
+    if figsize is None:
+        figsize = (max(7, len(configs) * 2.2), 6)
+
+    P = model_params_B * 1e9
+    to_gb = 1 / (1024**3)
+
+    labels = []
+    weights_gb, optim_gb, grad_gb, act_gb = [], [], [], []
+
+    for cfg in configs:
+        tp, pp = cfg["tp"], cfg["pp"]
+        label = cfg.get("label", f"TP{tp}×PP{pp}×DP{cfg['dp']}")
+        labels.append(label)
+
+        params_per_gpu = P / (tp * pp)
+        weights_gb.append(2 * params_per_gpu * to_gb)
+        optim_gb.append(12 * params_per_gpu * to_gb)
+        grad_gb.append(2 * params_per_gpu * to_gb)
+
+        layers_per_stage = layers // pp
+        act_mem = 2 * seq_len * (hidden // tp) * layers_per_stage * micro_batch * 2
+        act_gb.append(act_mem * to_gb)
+
+    x = np.arange(len(labels))
+    bar_w = 0.55
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52"]
+    bar_labels = ["Weights (fp16)", "Optimizer (Adam fp32)", "Gradients (fp16)", "Activations"]
+
+    bottoms = np.zeros(len(labels))
+    for vals, color, bl in zip(
+        [weights_gb, optim_gb, grad_gb, act_gb], colors, bar_labels
+    ):
+        vals_arr = np.array(vals)
+        ax.bar(x, vals_arr, bar_w, bottom=bottoms, color=color,
+               edgecolor="white", linewidth=0.8, label=bl)
+        # Value labels inside bars (only if tall enough)
+        for i, (v, b) in enumerate(zip(vals_arr, bottoms)):
+            if v > 3:
+                ax.text(i, b + v / 2, f"{v:.1f}", ha="center", va="center",
+                        fontsize=8, fontweight="bold", color="white")
+        bottoms += vals_arr
+
+    # Total labels on top
+    for i, total in enumerate(bottoms):
+        ax.text(i, total + 1, f"{total:.1f} GB", ha="center", va="bottom",
+                fontsize=10, fontweight="bold", color="#333")
+
+    # GPU memory limit line
+    ax.axhline(gpu_memory_gb, color="#C62828", linewidth=2, linestyle="--", alpha=0.7)
+    ax.text(len(labels) - 0.5, gpu_memory_gb + 1,
+            f"GPU limit ({gpu_memory_gb}GB)", fontsize=9,
+            color="#C62828", ha="right", fontweight="bold")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9, rotation=15, ha="right")
+    ax.set_ylabel("Memory per GPU (GB)", fontsize=12)
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.legend(fontsize=9, loc="upper right")
+    ax.grid(axis="y", alpha=0.3)
+    ax.set_ylim(0, max(bottoms) * 1.15)
+
+    plt.tight_layout()
+    return fig, ax
