@@ -8,14 +8,14 @@ Interactive, notebook-based teaching package for model parallelism and distribut
 
 | # | Topic | English | 中文 | 文言 |
 |---|-------|---------|------|------|
-| 00 | GPU Communication Primitives | [EN](notebooks/00-gpu-communication/01-gpu-communication.en.ipynb) | [中文](notebooks/00-gpu-communication/01-gpu-communication.zh.ipynb) | [文言](notebooks/00-gpu-communication/01-gpu-communication.lzh.ipynb) |
-| 01 | Data Parallelism (DP) | [EN](notebooks/01-data-parallelism/01-data-parallelism.en.ipynb) | [中文](notebooks/01-data-parallelism/01-data-parallelism.zh.ipynb) | [文言](notebooks/01-data-parallelism/01-data-parallelism.lzh.ipynb) |
-| 02 | Tensor Parallelism (TP) | [EN](notebooks/02-tensor-parallelism/01-tensor-parallelism.en.ipynb) | [中文](notebooks/02-tensor-parallelism/01-tensor-parallelism.zh.ipynb) | [文言](notebooks/02-tensor-parallelism/01-tensor-parallelism.lzh.ipynb) |
-| 03 | Pipeline Parallelism (PP) | [EN](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-en.ipynb) | [中文](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-zh.ipynb) | [文言](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-classical.ipynb) |
-| 04 | Sequence Parallelism (SP) | [EN](notebooks/04-sequence-parallelism/01-sequence-parallelism.en.ipynb) | [中文](notebooks/04-sequence-parallelism/01-sequence-parallelism.zh.ipynb) | [文言](notebooks/04-sequence-parallelism/01-sequence-parallelism.lzh.ipynb) |
-| 05 | Context Parallelism (CP) | [EN](notebooks/05-context-parallelism/01-context-parallelism.en.ipynb) | [中文](notebooks/05-context-parallelism/01-context-parallelism.zh.ipynb) | [文言](notebooks/05-context-parallelism/01-context-parallelism.lzh.ipynb) |
-| 06 | Expert Parallelism (EP / MoE) | [EN](notebooks/06-expert-parallelism/ep.en.ipynb) | [中文](notebooks/06-expert-parallelism/ep.zh.ipynb) | [文言](notebooks/06-expert-parallelism/ep.lzh.ipynb) |
-| 07 | Parallelism Mix Strategy | [EN](notebooks/07-parallelism-mix-strategy/07-parallelism-mix-strategy.en.ipynb) | [中文](notebooks/07-parallelism-mix-strategy/07-parallelism-mix-strategy.zh.ipynb) | [文言](notebooks/07-parallelism-mix-strategy/07-parallelism-mix-strategy.lzh.ipynb) |
+| 00 | GPU Communication Primitives | [EN](notebooks/en/00-gpu-communication.ipynb) | [中文](notebooks/zh/00-gpu-communication.ipynb) | [文言](notebooks/lzh/00-gpu-communication.ipynb) |
+| 01 | Data Parallelism (DP) | [EN](notebooks/en/01-data-parallelism.ipynb) | [中文](notebooks/zh/01-data-parallelism.ipynb) | [文言](notebooks/lzh/01-data-parallelism.ipynb) |
+| 02 | Tensor Parallelism (TP) | [EN](notebooks/en/02-tensor-parallelism.ipynb) | [中文](notebooks/zh/02-tensor-parallelism.ipynb) | [文言](notebooks/lzh/02-tensor-parallelism.ipynb) |
+| 03 | Pipeline Parallelism (PP) | [EN](notebooks/en/03-pipeline-parallelism.ipynb) | [中文](notebooks/zh/03-pipeline-parallelism.ipynb) | [文言](notebooks/lzh/03-pipeline-parallelism.ipynb) |
+| 04 | Sequence Parallelism (SP) | [EN](notebooks/en/04-sequence-parallelism.ipynb) | [中文](notebooks/zh/04-sequence-parallelism.ipynb) | [文言](notebooks/lzh/04-sequence-parallelism.ipynb) |
+| 05 | Context Parallelism (CP) | [EN](notebooks/en/05-context-parallelism.ipynb) | [中文](notebooks/zh/05-context-parallelism.ipynb) | [文言](notebooks/lzh/05-context-parallelism.ipynb) |
+| 06 | Expert Parallelism (EP / MoE) | [EN](notebooks/en/06-expert-parallelism.ipynb) | [中文](notebooks/zh/06-expert-parallelism.ipynb) | [文言](notebooks/lzh/06-expert-parallelism.ipynb) |
+| 07 | Parallelism Mix Strategy | [EN](notebooks/en/07-parallelism-mix-strategy.ipynb) | [中文](notebooks/zh/07-parallelism-mix-strategy.ipynb) | [文言](notebooks/lzh/07-parallelism-mix-strategy.ipynb) |
 
 ## Setup
 
