@@ -12,6 +12,7 @@ Interactive, notebook-based teaching package for model parallelism and distribut
 | 04 | Sequence Parallelism (SP) | [EN](notebooks/04-sequence-parallelism/01-sequence-parallelism.en.ipynb) | [中文](notebooks/04-sequence-parallelism/01-sequence-parallelism.zh.ipynb) | [文言](notebooks/04-sequence-parallelism/01-sequence-parallelism.lzh.ipynb) |
 | 05 | Context Parallelism (CP) | [EN](notebooks/05-context-parallelism/01-context-parallelism.en.ipynb) | [中文](notebooks/05-context-parallelism/01-context-parallelism.zh.ipynb) | [文言](notebooks/05-context-parallelism/01-context-parallelism.lzh.ipynb) |
 | 06 | Expert Parallelism (EP / MoE) | [EN](notebooks/06-expert-parallelism/ep.en.ipynb) | [中文](notebooks/06-expert-parallelism/ep.zh.ipynb) | [文言](notebooks/06-expert-parallelism/ep.lzh.ipynb) |
+| 07 | Parallelism Mix Strategy | [EN](notebooks/07-parallelism-mix-strategy/07-parallelism-mix-strategy.en.ipynb) | [中文](notebooks/07-parallelism-mix-strategy/07-parallelism-mix-strategy.zh.ipynb) | [文言](notebooks/07-parallelism-mix-strategy/07-parallelism-mix-strategy.lzh.ipynb) |
 
 ## Setup
 
