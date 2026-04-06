@@ -655,3 +655,225 @@ def draw_operator_fusion(title="Operator Fusion: Before vs After"):
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
     plt.tight_layout()
     return fig, axes
+
+
+# ---------------------------------------------------------------------------
+# Attention variant visualizations (MHA / MQA / GQA / MLA)
+# ---------------------------------------------------------------------------
+
+def draw_attention_head_layout(variant, n_q_heads, n_kv_heads, head_dim,
+                               title=None):
+    """Draw Q/K/V head layout showing sharing patterns for an attention variant.
+
+    Args:
+        variant: one of "mha", "mqa", "gqa", "mla"
+        n_q_heads: number of query heads
+        n_kv_heads: number of KV heads
+        head_dim: dimension per head
+        title: optional custom title
+    """
+    if title is None:
+        labels = {"mha": "Multi-Head Attention (MHA)",
+                  "mqa": "Multi-Query Attention (MQA)",
+                  "gqa": f"Grouped-Query Attention (GQA, {n_kv_heads} KV heads)",
+                  "mla": "Multi-Latent Attention (MLA)"}
+        title = labels.get(variant, variant)
+
+    group_size = n_q_heads // n_kv_heads
+    fig, ax = plt.subplots(figsize=(max(6, n_q_heads * 0.7), 4))
+
+    q_colors = plt.cm.Set3(np.linspace(0, 1, max(n_kv_heads, 2)))
+
+    # Q heads row
+    for i in range(n_q_heads):
+        kv_group = i // group_size
+        color = q_colors[kv_group % len(q_colors)]
+        rect = mpatches.FancyBboxPatch(
+            (i * 1.2, 2.5), 1.0, 0.7,
+            boxstyle="round,pad=0.05", facecolor=color,
+            edgecolor="#333", linewidth=1.0
+        )
+        ax.add_patch(rect)
+        ax.text(i * 1.2 + 0.5, 2.85, f"Q{i}", ha="center", va="center",
+                fontsize=9, fontweight="bold")
+
+    # KV heads row
+    kv_spacing = (n_q_heads * 1.2) / n_kv_heads
+    for j in range(n_kv_heads):
+        x_pos = j * kv_spacing + kv_spacing / 2 - 0.5
+        color = q_colors[j % len(q_colors)]
+
+        # K head
+        rect_k = mpatches.FancyBboxPatch(
+            (x_pos - 0.3, 0.8), 0.7, 0.6,
+            boxstyle="round,pad=0.05", facecolor=color,
+            edgecolor="#333", linewidth=1.2, alpha=0.9
+        )
+        ax.add_patch(rect_k)
+        ax.text(x_pos + 0.05, 1.1, f"K{j}", ha="center", va="center",
+                fontsize=8, fontweight="bold")
+
+        # V head
+        rect_v = mpatches.FancyBboxPatch(
+            (x_pos + 0.5, 0.8), 0.7, 0.6,
+            boxstyle="round,pad=0.05", facecolor=color,
+            edgecolor="#333", linewidth=1.2, alpha=0.7
+        )
+        ax.add_patch(rect_v)
+        ax.text(x_pos + 0.85, 1.1, f"V{j}", ha="center", va="center",
+                fontsize=8, fontweight="bold")
+
+        # Connection lines from Q heads to KV heads
+        for qi in range(j * group_size, (j + 1) * group_size):
+            ax.plot([qi * 1.2 + 0.5, x_pos + 0.35], [2.5, 1.4],
+                    color=color, alpha=0.4, linewidth=1.0)
+
+    # Labels
+    ax.text(-1.0, 2.85, "Q", fontsize=12, fontweight="bold", va="center")
+    ax.text(-1.0, 1.1, "KV", fontsize=12, fontweight="bold", va="center")
+
+    # Summary stats
+    cache_per_token = 2 * n_kv_heads * head_dim
+    if variant == "mla":
+        ax.text(n_q_heads * 0.6, 0.1,
+                "Cache: compressed latent (not separate K/V)",
+                ha="center", fontsize=10, color="#4C72B0", fontweight="bold")
+    else:
+        reduction = n_q_heads / n_kv_heads
+        label = f"Cache: {cache_per_token} values/token"
+        if reduction > 1:
+            label += f" ({reduction:.0f}x reduction vs MHA)"
+        ax.text(n_q_heads * 0.6, 0.1, label,
+                ha="center", fontsize=10,
+                color="#C44E52" if reduction > 1 else "#333",
+                fontweight="bold")
+
+    ax.set_xlim(-1.5, n_q_heads * 1.2 + 0.5)
+    ax.set_ylim(-0.3, 3.8)
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.axis("off")
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_kv_cache_comparison_bar(configs, title="KV-Cache Memory per Token by Attention Variant"):
+    """Bar chart comparing KV cache sizes across attention variants.
+
+    Args:
+        configs: list of dicts, each with keys:
+            - name: display name (e.g. "MHA (LLaMA-2-70B)")
+            - variant: "mha", "mqa", "gqa", or "mla"
+            - n_heads: number of query heads
+            - n_kv_heads: number of KV heads
+            - head_dim: dimension per head
+            - n_layers: number of layers
+            - d_compressed: (MLA only) compressed dimension
+            - dtype_bytes: bytes per element (default 2)
+        title: plot title
+    """
+    from mp_tutorial.inference import calc_kv_cache_size
+
+    names = []
+    sizes_gb = []
+    colors = []
+    color_map = {"mha": "#4C72B0", "mqa": "#DD8452", "gqa": "#55A868", "mla": "#8172B3"}
+    seq_len = 4096  # standard comparison length
+
+    for cfg in configs:
+        names.append(cfg["name"])
+        size = calc_kv_cache_size(
+            variant=cfg["variant"],
+            n_heads=cfg["n_heads"],
+            n_kv_heads=cfg["n_kv_heads"],
+            head_dim=cfg["head_dim"],
+            seq_len=seq_len,
+            n_layers=cfg["n_layers"],
+            d_compressed=cfg.get("d_compressed"),
+            dtype_bytes=cfg.get("dtype_bytes", 2)
+        )
+        sizes_gb.append(size / (1024 ** 3))
+        colors.append(color_map.get(cfg["variant"], "#8C8C8C"))
+
+    fig, ax = plt.subplots(figsize=(max(7, len(configs) * 1.8), 5))
+    bars = ax.bar(range(len(names)), sizes_gb, color=colors, edgecolor="#333",
+                  linewidth=0.8, width=0.6)
+
+    # Value labels on bars
+    for bar, val in zip(bars, sizes_gb):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.02,
+                f"{val:.2f} GB", ha="center", va="bottom", fontsize=10,
+                fontweight="bold")
+
+    ax.set_xticks(range(len(names)))
+    ax.set_xticklabels(names, fontsize=10, rotation=15, ha="right")
+    ax.set_ylabel("KV-Cache Memory (GB)", fontsize=11)
+    ax.set_title(f"{title}\n(seq_len={seq_len}, fp16)", fontsize=13, fontweight="bold")
+    ax.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    return fig, ax
+
+
+def draw_mla_projection_flow(d_model, d_compressed, n_heads, head_dim,
+                              title="MLA: Low-Rank KV Compression Pipeline"):
+    """Flow diagram showing MLA's compress -> cache -> decompress pipeline.
+
+    Args:
+        d_model: input model dimension
+        d_compressed: compressed latent dimension
+        n_heads: number of attention heads
+        head_dim: dimension per head
+    """
+    fig, ax = plt.subplots(figsize=(14, 5))
+
+    boxes = [
+        {"label": f"Input\n({d_model})", "x": 0.5, "color": "#4C72B0"},
+        {"label": f"Down-Project\nW_down\n({d_model}->{d_compressed})", "x": 3.0, "color": "#DD8452"},
+        {"label": f"Compressed\nLatent\n({d_compressed})", "x": 6.0, "color": "#C44E52"},
+        {"label": f"Up-Project\nW_up_k, W_up_v\n({d_compressed}->{n_heads}x{head_dim})", "x": 9.5, "color": "#DD8452"},
+        {"label": f"K, V\n({n_heads}x{head_dim})", "x": 13.0, "color": "#55A868"},
+    ]
+
+    box_w, box_h = 2.2, 2.0
+    for box in boxes:
+        rect = mpatches.FancyBboxPatch(
+            (box["x"], 1.5), box_w, box_h,
+            boxstyle="round,pad=0.15", facecolor=box["color"],
+            edgecolor="#333", linewidth=1.5, alpha=0.85
+        )
+        ax.add_patch(rect)
+        ax.text(box["x"] + box_w / 2, 1.5 + box_h / 2, box["label"],
+                ha="center", va="center", fontsize=10, fontweight="bold",
+                color="white")
+
+    # Arrows
+    arrow_style = dict(arrowstyle="-|>", color="#333", lw=2)
+    for i in range(len(boxes) - 1):
+        ax.annotate("", xy=(boxes[i+1]["x"], 2.5),
+                    xytext=(boxes[i]["x"] + box_w, 2.5),
+                    arrowprops=arrow_style)
+
+    # Cache indicator
+    cache_x = boxes[2]["x"]
+    cache_rect = mpatches.FancyBboxPatch(
+        (cache_x - 0.3, 0.2), box_w + 0.6, 0.9,
+        boxstyle="round,pad=0.1", facecolor="#FFF3E0",
+        edgecolor="#C44E52", linewidth=2.0, linestyle="--"
+    )
+    ax.add_patch(cache_rect)
+    ax.text(cache_x + box_w / 2, 0.65, "<- CACHED (per token) ->",
+            ha="center", va="center", fontsize=10, fontweight="bold",
+            color="#C44E52")
+
+    # Compression ratio
+    ratio = (2 * n_heads * head_dim) / d_compressed
+    ax.text(7.5, 4.2,
+            f"Compression: {2 * n_heads * head_dim} -> {d_compressed} "
+            f"({ratio:.1f}x reduction)",
+            ha="center", fontsize=12, fontweight="bold", color="#4C72B0")
+
+    ax.set_xlim(-0.5, 16)
+    ax.set_ylim(-0.2, 5)
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.axis("off")
+    plt.tight_layout()
+    return fig, ax

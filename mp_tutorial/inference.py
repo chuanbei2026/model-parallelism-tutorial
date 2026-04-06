@@ -736,3 +736,117 @@ class PrefixCache:
         for tok, child in node.children.items():
             result["children"][tok] = self.get_tree_structure(child, prefix + [tok])
         return result
+
+
+# ---------------------------------------------------------------------------
+# Attention variant helpers (MHA / MQA / GQA / MLA)
+# ---------------------------------------------------------------------------
+
+def calc_kv_cache_size(variant, n_heads, n_kv_heads, head_dim, seq_len,
+                       n_layers, d_compressed=None, dtype_bytes=2):
+    """Compute KV-cache size in bytes for different attention variants.
+
+    Args:
+        variant: one of "mha", "mqa", "gqa", "mla"
+        n_heads: number of query heads
+        n_kv_heads: number of KV heads (equals n_heads for MHA, 1 for MQA)
+        head_dim: dimension per head
+        seq_len: sequence length
+        n_layers: number of transformer layers
+        d_compressed: compressed latent dimension (required for MLA)
+        dtype_bytes: bytes per element (2 for fp16)
+
+    Returns:
+        int: total KV-cache memory in bytes
+    """
+    if variant in ("mha", "mqa", "gqa"):
+        return 2 * n_layers * n_kv_heads * seq_len * head_dim * dtype_bytes
+    elif variant == "mla":
+        if d_compressed is None:
+            raise ValueError("d_compressed is required for MLA variant")
+        return n_layers * seq_len * d_compressed * dtype_bytes
+    else:
+        raise ValueError(f"Unknown variant: {variant}")
+
+
+def attention_forward_sim(variant, x, n_heads, n_kv_heads, head_dim,
+                          d_compressed=None):
+    """Simplified attention forward pass returning intermediate tensors.
+
+    Uses random projections (no learned weights) to illustrate tensor shapes
+    and the dataflow for each attention variant.
+
+    Args:
+        variant: one of "mha", "mqa", "gqa", "mla"
+        x: input tensor of shape (batch, seq_len, d_model)
+        n_heads: number of query heads
+        n_kv_heads: number of KV heads
+        head_dim: dimension per head
+        d_compressed: compressed latent dimension (required for MLA)
+
+    Returns:
+        dict with keys depending on variant:
+            - q, k, v: projected tensors
+            - scores: attention scores
+            - output: attention output
+            - compressed_kv (MLA only): compressed latent representation
+    """
+    B, S, d_model = x.shape
+
+    torch.manual_seed(42)
+
+    if variant in ("mha", "mqa", "gqa"):
+        W_q = torch.randn(d_model, n_heads * head_dim) * (d_model ** -0.5)
+        W_k = torch.randn(d_model, n_kv_heads * head_dim) * (d_model ** -0.5)
+        W_v = torch.randn(d_model, n_kv_heads * head_dim) * (d_model ** -0.5)
+
+        q = (x @ W_q).view(B, S, n_heads, head_dim).transpose(1, 2)
+        k = (x @ W_k).view(B, S, n_kv_heads, head_dim).transpose(1, 2)
+        v = (x @ W_v).view(B, S, n_kv_heads, head_dim).transpose(1, 2)
+
+        # Expand KV heads to match Q heads via repeat_interleave
+        n_groups = n_heads // n_kv_heads
+        k_expanded = k.repeat_interleave(n_groups, dim=1)
+        v_expanded = v.repeat_interleave(n_groups, dim=1)
+
+        scores = torch.matmul(q, k_expanded.transpose(-2, -1)) / math.sqrt(head_dim)
+        attn = F.softmax(scores, dim=-1)
+        out = torch.matmul(attn, v_expanded)
+        out = out.transpose(1, 2).contiguous().view(B, S, n_heads * head_dim)
+
+        return {"q": q, "k": k, "v": v, "scores": scores, "output": out}
+
+    elif variant == "mla":
+        if d_compressed is None:
+            raise ValueError("d_compressed is required for MLA variant")
+
+        W_q = torch.randn(d_model, n_heads * head_dim) * (d_model ** -0.5)
+        # Down-projection: d_model -> d_compressed
+        W_down = torch.randn(d_model, d_compressed) * (d_model ** -0.5)
+        # Up-projections: d_compressed -> n_kv_heads * head_dim (for K and V)
+        W_up_k = torch.randn(d_compressed, n_kv_heads * head_dim) * (d_compressed ** -0.5)
+        W_up_v = torch.randn(d_compressed, n_kv_heads * head_dim) * (d_compressed ** -0.5)
+
+        q = (x @ W_q).view(B, S, n_heads, head_dim).transpose(1, 2)
+
+        # Compress: this is what gets cached
+        compressed_kv = x @ W_down  # (B, S, d_compressed)
+
+        # Decompress for attention
+        k = (compressed_kv @ W_up_k).view(B, S, n_kv_heads, head_dim).transpose(1, 2)
+        v = (compressed_kv @ W_up_v).view(B, S, n_kv_heads, head_dim).transpose(1, 2)
+
+        n_groups = n_heads // n_kv_heads
+        k_expanded = k.repeat_interleave(n_groups, dim=1)
+        v_expanded = v.repeat_interleave(n_groups, dim=1)
+
+        scores = torch.matmul(q, k_expanded.transpose(-2, -1)) / math.sqrt(head_dim)
+        attn = F.softmax(scores, dim=-1)
+        out = torch.matmul(attn, v_expanded)
+        out = out.transpose(1, 2).contiguous().view(B, S, n_heads * head_dim)
+
+        return {"q": q, "k": k, "v": v, "scores": scores, "output": out,
+                "compressed_kv": compressed_kv}
+
+    else:
+        raise ValueError(f"Unknown variant: {variant}")
