@@ -6,6 +6,7 @@ Interactive, notebook-based teaching package for model parallelism and distribut
 
 | # | Topic | English | 中文 | 文言 |
 |---|-------|---------|------|------|
+| 00 | GPU Communication Primitives | [EN](notebooks/00-gpu-communication/01-gpu-communication.en.ipynb) | [中文](notebooks/00-gpu-communication/01-gpu-communication.zh.ipynb) | [文言](notebooks/00-gpu-communication/01-gpu-communication.lzh.ipynb) |
 | 01 | Data Parallelism (DP) | [EN](notebooks/01-data-parallelism/01-data-parallelism.en.ipynb) | [中文](notebooks/01-data-parallelism/01-data-parallelism.zh.ipynb) | [文言](notebooks/01-data-parallelism/01-data-parallelism.lzh.ipynb) |
 | 02 | Tensor Parallelism (TP) | [EN](notebooks/02-tensor-parallelism/01-tensor-parallelism.en.ipynb) | [中文](notebooks/02-tensor-parallelism/01-tensor-parallelism.zh.ipynb) | [文言](notebooks/02-tensor-parallelism/01-tensor-parallelism.lzh.ipynb) |
 | 03 | Pipeline Parallelism (PP) | [EN](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-en.ipynb) | [中文](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-zh.ipynb) | [文言](notebooks/03-pipeline-parallelism/03-pipeline-parallelism-classical.ipynb) |

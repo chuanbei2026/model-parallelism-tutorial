@@ -135,6 +135,21 @@ def simulate_reduce_scatter(tensors):
     return [chunk.clone() for chunk in chunks]
 
 
+def simulate_broadcast(tensor, num_gpus):
+    """Simulate Broadcast on CPU.
+
+    Copies a tensor from 'GPU 0' to all other GPUs.
+
+    Args:
+        tensor: Source tensor (from 'GPU 0').
+        num_gpus: Number of destination GPUs.
+
+    Returns:
+        List of tensor copies, one per GPU.
+    """
+    return [tensor.clone() for _ in range(num_gpus)]
+
+
 def simulate_p2p_kv_exchange(kv_blocks):
     """Simulate one round of point-to-point KV block rotation around a ring.
 

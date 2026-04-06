@@ -557,7 +557,8 @@ def draw_comm_pattern(pattern, num_gpus, title=None, figsize=(8, 6)):
 
     Args:
         pattern: One of "allreduce", "allgather", "reduce_scatter",
-                 "broadcast", "all_to_all", "ring".
+                 "broadcast", "scatter", "gather", "reduce",
+                 "all_to_all", "ring".
         num_gpus: Number of GPUs to show.
         title: Plot title. Defaults to pattern name.
         figsize: Figure size tuple.
@@ -612,6 +613,18 @@ def draw_comm_pattern(pattern, num_gpus, title=None, figsize=(8, 6)):
     elif pattern == "broadcast":
         for i in range(1, num_gpus):
             _arrow(0, i)
+    elif pattern == "scatter":
+        for i in range(1, num_gpus):
+            _arrow(0, i, "#FF9800")
+        ax.text(0, -1.35, "Root sends chunk i to GPU i", ha="center", fontsize=9, style="italic")
+    elif pattern == "gather":
+        for i in range(1, num_gpus):
+            _arrow(i, 0, "#4CAF50")
+        ax.text(0, -1.35, "All GPUs send their data to root", ha="center", fontsize=9, style="italic")
+    elif pattern == "reduce":
+        for i in range(1, num_gpus):
+            _arrow(i, 0, "#9C27B0")
+        ax.text(0, -1.35, "Sum all → result on root only", ha="center", fontsize=9, style="italic")
     elif pattern == "reduce_scatter":
         for i in range(num_gpus):
             _arrow(i, (i + 1) % num_gpus)
@@ -626,6 +639,70 @@ def draw_comm_pattern(pattern, num_gpus, title=None, figsize=(8, 6)):
 
     plt.tight_layout()
     return fig, ax
+
+
+def draw_p2p_vs_collective(num_gpus=4, figsize=(14, 5)):
+    """Draw side-by-side comparison of P2P sends vs a single collective call.
+
+    Left panel shows O(N²) point-to-point messages for an all-to-all exchange.
+    Right panel shows a single collective call achieving the same result.
+
+    Args:
+        num_gpus: Number of GPUs to show.
+        figsize: Figure size tuple.
+
+    Returns:
+        Tuple of (fig, axes).
+    """
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    colors = plt.cm.Set2(np.linspace(0, 1, num_gpus))
+
+    for ax_idx, (ax, label) in enumerate(zip(axes, ["Point-to-Point", "Collective (AllReduce)"])):
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        ax.set_title(label, fontsize=13, fontweight="bold", pad=12)
+
+        angles = np.linspace(0, 2 * np.pi, num_gpus, endpoint=False)
+        angles = np.pi / 2 - angles
+        positions = [(np.cos(a), np.sin(a)) for a in angles]
+        node_r = 0.15
+
+        for i, (x, y) in enumerate(positions):
+            circle = plt.Circle((x, y), node_r, color=colors[i], ec="black", lw=1.5, zorder=3)
+            ax.add_patch(circle)
+            ax.text(x, y, f"GPU\n{i}", ha="center", va="center", fontsize=8, fontweight="bold", zorder=4)
+
+        arrow_kw = dict(arrowstyle="->,head_width=0.06,head_length=0.05", lw=1.0,
+                        connectionstyle="arc3,rad=0.15", zorder=2)
+
+        def _arrow(src, dst, color="#888"):
+            xi, yi = positions[src]
+            xj, yj = positions[dst]
+            dx, dy = xj - xi, yj - yi
+            d = np.sqrt(dx**2 + dy**2)
+            s = node_r / d
+            ax.annotate("", xy=(xj - dx*s, yj - dy*s), xytext=(xi + dx*s, yi + dy*s),
+                         arrowprops=dict(**arrow_kw, color=color))
+
+        if ax_idx == 0:
+            for i in range(num_gpus):
+                for j in range(num_gpus):
+                    if i != j:
+                        _arrow(i, j, "#CC0000")
+            n_msgs = num_gpus * (num_gpus - 1)
+            ax.text(0, -1.4, f"{n_msgs} messages", ha="center", fontsize=11, color="#CC0000", fontweight="bold")
+        else:
+            for i in range(num_gpus):
+                j = (i + 1) % num_gpus
+                _arrow(i, j, "#2196F3")
+                _arrow(j, i, "#2196F3")
+            ax.text(0, -1.4, "1 collective call", ha="center", fontsize=11, color="#2196F3", fontweight="bold")
+
+    fig.suptitle("Why Collectives?", fontsize=15, fontweight="bold", y=1.02)
+    plt.tight_layout()
+    return fig, axes
 
 
 def draw_ring_attention_steps(num_gpus, num_steps=None, title="Ring Attention Steps"):
