@@ -11,12 +11,21 @@ import warnings
 import matplotlib
 import matplotlib.font_manager as fm
 
+# Suppress "Glyph N missing from font(s)" warnings at import time.
+# CJK fonts lack some symbol glyphs (subscript digits, check marks, etc.)
+# and non-CJK fonts lack CJK glyphs — matplotlib renders them via fallback,
+# but emits a noisy UserWarning for each missing glyph.
+warnings.filterwarnings(
+    "ignore", message="Glyph.*missing from font", category=UserWarning
+)
+
 # CJK font candidates in preference order (common across platforms).
 _CJK_CANDIDATES = [
     # macOS
     "PingFang SC",
     "PingFang HK",
     "Hiragino Sans GB",
+    "Hiragino Sans",
     "Heiti SC",
     "Heiti TC",
     "STHeiti",
@@ -51,14 +60,6 @@ def configure_cjk_fonts():
     if cjk_found:
         current = matplotlib.rcParams["font.sans-serif"]
         matplotlib.rcParams["font.sans-serif"] = cjk_found + current
-        # Also allow minus sign to render correctly with CJK fonts
         matplotlib.rcParams["axes.unicode_minus"] = False
-
-    # Suppress "Glyph N missing from font(s)" warnings.  CJK fonts lack
-    # some Latin/symbol glyphs (subscript digits, check marks, etc.) but
-    # matplotlib still renders them via fallback — the warning is just noise.
-    warnings.filterwarnings(
-        "ignore", message="Glyph.*missing from font", category=UserWarning
-    )
 
     _configured = True
