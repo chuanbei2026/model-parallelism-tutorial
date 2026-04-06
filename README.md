@@ -6,7 +6,7 @@ Interactive, notebook-based tutorials on distributed training, inference optimiz
 
 ## Inspiration
 
-Karpathy recently shared his obsidian-llm knowledge base setup — a great demonstration of turning personal notes into a queryable system. This sparked a further idea: what if a knowledge base didn't just answer questions, but had a **task head** that could distill papers, PDFs, and blog posts into step-by-step interactive tutorials?
+Karpathy recently shared his [obsidian-llm](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) knowledge base setup — a great demonstration of turning personal notes into a queryable system. This sparked a further idea: what if a knowledge base didn't just answer questions, but had a **task head** that could distill papers, PDFs, and blog posts into step-by-step interactive tutorials?
 
 That's how this repo started. The next step is to build an automated workflow: whenever a new paper or blog is added to the knowledge base, Claude Code generates a tutorial notebook and pushes it here. Knowledge in, tutorials out.
 
