@@ -1,0 +1,26 @@
+# Jupyter
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+# Development workflow (Claude Code, OpenSpec)
+.claude/
+openspec/
+templates/
+
+# Build scripts (internal tooling)
+notebooks/**/_build_*.py
