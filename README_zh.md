@@ -12,15 +12,15 @@
 
 | # | 主题 | EN | 中文 | 文言 |
 |---|------|----|------|------|
-| 00 | GPU 通信原语 | [EN](notebooks/en/00-gpu-communication.ipynb) | [中文](notebooks/zh/00-gpu-communication.ipynb) | [文言](notebooks/lzh/00-gpu-communication.ipynb) |
-| 01 | 数据并行 (DP) | [EN](notebooks/en/01-data-parallelism.ipynb) | [中文](notebooks/zh/01-data-parallelism.ipynb) | [文言](notebooks/lzh/01-data-parallelism.ipynb) |
-| 02 | 张量并行 (TP) | [EN](notebooks/en/02-tensor-parallelism.ipynb) | [中文](notebooks/zh/02-tensor-parallelism.ipynb) | [文言](notebooks/lzh/02-tensor-parallelism.ipynb) |
-| 03 | 流水线并行 (PP) | [EN](notebooks/en/03-pipeline-parallelism.ipynb) | [中文](notebooks/zh/03-pipeline-parallelism.ipynb) | [文言](notebooks/lzh/03-pipeline-parallelism.ipynb) |
-| 04 | 序列并行 (SP) | [EN](notebooks/en/04-sequence-parallelism.ipynb) | [中文](notebooks/zh/04-sequence-parallelism.ipynb) | [文言](notebooks/lzh/04-sequence-parallelism.ipynb) |
-| 05 | 上下文并行 (CP) | [EN](notebooks/en/05-context-parallelism.ipynb) | [中文](notebooks/zh/05-context-parallelism.ipynb) | [文言](notebooks/lzh/05-context-parallelism.ipynb) |
-| 06 | 专家并行 (EP / MoE) | [EN](notebooks/en/06-expert-parallelism.ipynb) | [中文](notebooks/zh/06-expert-parallelism.ipynb) | [文言](notebooks/lzh/06-expert-parallelism.ipynb) |
-| 07 | 并行策略混合 | [EN](notebooks/en/07-parallelism-mix-strategy.ipynb) | [中文](notebooks/zh/07-parallelism-mix-strategy.ipynb) | [文言](notebooks/lzh/07-parallelism-mix-strategy.ipynb) |
-| 08 | 混合精度训练 | [EN](notebooks/en/08-mixed-precision-training.ipynb) | [中文](notebooks/zh/08-mixed-precision-training.ipynb) | [文言](notebooks/lzh/08-mixed-precision-training.ipynb) |
+| 00 | GPU 通信原语 | [EN](notebooks/en/model-parallelism/00-gpu-communication.ipynb) | [中文](notebooks/zh/model-parallelism/00-gpu-communication.ipynb) | [文言](notebooks/lzh/model-parallelism/00-gpu-communication.ipynb) |
+| 01 | 数据并行 (DP) | [EN](notebooks/en/model-parallelism/01-data-parallelism.ipynb) | [中文](notebooks/zh/model-parallelism/01-data-parallelism.ipynb) | [文言](notebooks/lzh/model-parallelism/01-data-parallelism.ipynb) |
+| 02 | 张量并行 (TP) | [EN](notebooks/en/model-parallelism/02-tensor-parallelism.ipynb) | [中文](notebooks/zh/model-parallelism/02-tensor-parallelism.ipynb) | [文言](notebooks/lzh/model-parallelism/02-tensor-parallelism.ipynb) |
+| 03 | 流水线并行 (PP) | [EN](notebooks/en/model-parallelism/03-pipeline-parallelism.ipynb) | [中文](notebooks/zh/model-parallelism/03-pipeline-parallelism.ipynb) | [文言](notebooks/lzh/model-parallelism/03-pipeline-parallelism.ipynb) |
+| 04 | 序列并行 (SP) | [EN](notebooks/en/model-parallelism/04-sequence-parallelism.ipynb) | [中文](notebooks/zh/model-parallelism/04-sequence-parallelism.ipynb) | [文言](notebooks/lzh/model-parallelism/04-sequence-parallelism.ipynb) |
+| 05 | 上下文并行 (CP) | [EN](notebooks/en/model-parallelism/05-context-parallelism.ipynb) | [中文](notebooks/zh/model-parallelism/05-context-parallelism.ipynb) | [文言](notebooks/lzh/model-parallelism/05-context-parallelism.ipynb) |
+| 06 | 专家并行 (EP / MoE) | [EN](notebooks/en/model-parallelism/06-expert-parallelism.ipynb) | [中文](notebooks/zh/model-parallelism/06-expert-parallelism.ipynb) | [文言](notebooks/lzh/model-parallelism/06-expert-parallelism.ipynb) |
+| 07 | 并行策略混合 | [EN](notebooks/en/model-parallelism/07-parallelism-mix-strategy.ipynb) | [中文](notebooks/zh/model-parallelism/07-parallelism-mix-strategy.ipynb) | [文言](notebooks/lzh/model-parallelism/07-parallelism-mix-strategy.ipynb) |
+| 08 | 混合精度训练 | [EN](notebooks/en/model-parallelism/08-mixed-precision-training.ipynb) | [中文](notebooks/zh/model-parallelism/08-mixed-precision-training.ipynb) | [文言](notebooks/lzh/model-parallelism/08-mixed-precision-training.ipynb) |
 
 ### 2. 推理优化
 
