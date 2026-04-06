@@ -6,6 +6,8 @@ matplotlib's ``font.sans-serif`` list so that Chinese/Japanese/Korean
 glyphs render correctly instead of showing as squares (tofu).
 """
 
+import warnings
+
 import matplotlib
 import matplotlib.font_manager as fm
 
@@ -51,5 +53,12 @@ def configure_cjk_fonts():
         matplotlib.rcParams["font.sans-serif"] = cjk_found + current
         # Also allow minus sign to render correctly with CJK fonts
         matplotlib.rcParams["axes.unicode_minus"] = False
+
+    # Suppress "Glyph N missing from font(s)" warnings.  CJK fonts lack
+    # some Latin/symbol glyphs (subscript digits, check marks, etc.) but
+    # matplotlib still renders them via fallback — the warning is just noise.
+    warnings.filterwarnings(
+        "ignore", message="Glyph.*missing from font", category=UserWarning
+    )
 
     _configured = True
